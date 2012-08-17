@@ -127,7 +127,7 @@ class Cart_m extends MY_Model
 			$response['products'] = $this->cart->contents();
 
 			// Update cart pricing
-			$this->update_order_cost(0, FALSE);
+			$this->orders_m->update_order_cost(0, FALSE);
 
 			// Add pricing
 			$response['total'] 		= $this->cart->total;
@@ -179,7 +179,6 @@ class Cart_m extends MY_Model
 	 */
 	public function sale_complete($order)
 	{
-
 		// Update this order status
 		$this->orders_m->update_status($order['id'], 2);
 

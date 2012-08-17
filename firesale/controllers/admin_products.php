@@ -3,10 +3,15 @@
 class Admin_products extends Admin_Controller
 {
 
-	public $tabs	= array('description' => array('description'), 'shipping options' => array('shipping_weight', 'shipping_height', 'shipping_width', 'shipping_depth'));
 	public $stream  = NULL;
 	public $perpage = 30;
 	public $section = 'products';
+	public $tabs	= array('description'      => array('description'),
+							'shipping options' => array('shipping_weight', 'shipping_height', 'shipping_width', 'shipping_depth'),
+							'metadata'		   => array('meta_title', 'meta_description', 'meta_keywords'),
+							'_attributes'	   => '{{ firesale_attributes:form product=id }}',
+							'_images'		   => array());
+
 
 	public function __construct()
 	{
@@ -20,6 +25,7 @@ class Admin_products extends Admin_Controller
 		$this->load->model('streams_core/row_m');
 		$this->load->library('streams_core/fields');
 		$this->load->library('files/files');
+		$this->load->helper('general');
 
 		// Add metadata
 		$this->template->append_css('module::products.css')
@@ -34,51 +40,56 @@ class Admin_products extends Admin_Controller
 
 	}
 
-	public function index($category = 0, $start = 0)
+	public function index($type = 'na', $value = 'na', $start = 0)
 	{
 
-		// Set query paramaters
-		$params	= array(
-					'stream' 	=> 'firesale_products',
-					'namespace'	=> 'firesale_products',
-					'limit'		=> $this->perpage,
-					'offset'	=> $start,
-					'order_by'	=> 'id',
-					'sort'		=> 'desc'
-				   );
-		
-		// Get by category if set
-		if( $category > 0 )
+		// Check for btnAction
+		if( $action = $this->input->post('btnAction') )
 		{
-			$params['where'] = 'category=' . $category;
+			$this->$action();
 		}
-		
-		// Get entries		
-		$products = $this->streams->entries->get_entries($params);
-	
+
+		// Get filter if set
+		if( $type != 'na' AND $value != 'na' )
+		{
+			$filter   = array($type => $value);
+			$products = $this->products_m->get_products($filter, $start, $this->perpage);
+			$this->data->$type = $value;
+		}
+		else
+		{
+			$products = $this->products_m->get_products(array(), $start, $this->perpage);
+		}
+
+		// Build product data
+		foreach( $products AS &$product )
+		{
+			$product = $this->products_m->get_product($product['id']);
+		}
+			
 		// Assign variables
-		$this->data->products 	= $products['entries'];
-		$this->data->count		= 808; // move to function soon
-		$this->data->pagination = create_pagination('/admin/firesale/products/' . ( 0 + $category ) . '/', $this->data->count, $this->perpage, 5);
+		$this->data->products 	= $products;
+		$this->data->count      = $this->products_m->get_products(( isset($filter) ? $filter : array() ), 0, 0);
+		$this->data->count		= ( $this->data->count ? count($this->data->count) : 0 );
+		$this->data->pagination = create_pagination('/admin/firesale/products/' . ( $type != 'na' ? $type : 'na' ) . '/' . ( $value != 'na' ? $value : 'na' ) . '/', $this->data->count, $this->perpage, 6);
 		$this->data->categories = array(0 => lang('firesale:label_filtersel')) + $this->categories_m->dropdown_values();
-		$this->data->category	= $category;
 
-		// Get initial product image
-		foreach( $this->data->products AS $key => $product )
-		{
-			$this->data->products[$key]['image'] = $this->products_m->get_single_image($product['id']);
-		}
-
-		// Build the page
+		// Add page data
 		$this->template->title(lang('firesale:title') . ' ' . lang('firesale:sections:products'))
-					   ->build('admin/products/index', $this->data);
+					   ->set($this->data);
+
+		// Fire events
+		Events::trigger('page_build', $this->template);
+
+		// Build page
+		$this->template->build('admin/products/index');
 	}
 	
 	public function create($id = NULL, $row = NULL)
 	{
 
 		// Check for post data
-		if( $this->input->post('btnAction') == 'save' )
+		if( substr($this->input->post('btnAction'), 0, 4) == 'save' )
 		{
 			
 			// Variables
@@ -90,9 +101,26 @@ class Admin_products extends Admin_Controller
 						'error_message'		=> lang('firesale:prod_' . ( $id == NULL ? 'add' : 'edit' ) . '_error')
 					  );
 
+			// Check button action for return location
+			if( $this->input->post('btnAction') == 'save_exit' )
+			{
+				$extra['return'] = '/admin/firesale/products';
+			}
+
 			// Manually update categories
+			// Multiple tends not to do it
 			if( $id !== NULL )
+			{
 				$this->products_m->update_categories($id, $this->stream->id, $input['category']);
+				unset($_POST['category']);
+			}
+
+			// Added to seperate if since above will be removed for 2.2
+			if( $id !== NULL )
+			{
+				$data = array_merge(array('id' => $id, 'stream' => 'firesale_products'), $input);
+				Events::trigger('product_updated', $data);
+			}
 		
 		}
 		else
@@ -108,7 +136,7 @@ class Admin_products extends Admin_Controller
 		// Assign variables
 		if( $row !== NULL ) { $this->data = $row; }
 		$this->data->id		=  $id;
-		$this->data->fields =  $this->products_m->fields_to_tabs($fields, $this->tabs);
+		$this->data->fields =  fields_to_tabs($fields, $this->tabs);
 		$this->data->tabs	=  array_reverse(array_keys($this->data->fields));
 		
 		// Get current images
@@ -124,9 +152,17 @@ class Admin_products extends Admin_Controller
 					   ->append_js('module::upload.js')
 					   ->append_metadata($this->load->view('fragments/wysiwyg', NULL, TRUE));
 	
-		// Build the page
+		// Add page data
 		$this->template->title(lang('firesale:title') . ' ' . lang('firesale:prod_title_' . ( $id == NULL ? 'create' : 'edit' )))
-					   ->build('admin/products/create', $this->data);
+					   ->set($this->data)
+					   ->enable_parser(true);
+
+		// Fire events
+		Events::trigger('page_build', $this->template);
+
+		// Build page
+		$this->template->build('admin/products/create');
+
 	}
 	
 	public function edit($id)
@@ -188,6 +224,57 @@ class Admin_products extends Admin_Controller
 		redirect('admin/firesale/products');
 		
 	}
+
+	public function duplicate($prod_id = 0 )
+	{
+
+		$duplicate = true;
+		$products  = $this->input->post('action_to');
+		$latest    = 0;
+
+		if( $this->input->post('btnAction') == 'duplicate' )
+		{
+		
+			for( $i = 0; $i < count($products); $i++ )
+			{
+			
+				if( !$latest = $this->products_m->duplicate_product($products[$i]) )
+				{
+					$duplicate = false;
+				}
+			
+			}
+		
+		}
+		else if( $prod_id !== null )
+		{
+		
+			if( !$latest = $this->products_m->duplicate_product($prod_id) )
+			{
+				$duplicate = false;
+			}
+		
+		}
+		
+		if( $duplicate )
+		{
+			$this->session->set_flashdata('success', lang('firesale:prod_duplicate_success'));
+		}
+		else
+		{
+			$this->session->set_flashdata('error', lang('firesale:prod_duplicate_error'));
+		}
+
+		if( ( $prod_id !== NULL OR count($products) == 1 ) AND $latest != 0 )
+		{
+			redirect('admin/firesale/products/edit/' . $latest);
+		}
+		else
+		{
+			redirect('admin/firesale/products');
+		}
+
+	}
 	
 	public function upload($id)
 	{
@@ -231,16 +318,18 @@ class Admin_products extends Admin_Controller
 		if( $this->input->is_ajax_request() )
 		{
 
-			$update = $this->products_m->update_product($this->input->post(), true);
+			$update = $this->products_m->update_product($this->input->post(), $this->stream->id, true);
 	
 			if( isset($update) && $update == TRUE )
 			{
 				$this->session->set_flashdata('success', lang('firesale:prod_edit_success'));
 				echo 'ok';
+				exit();
 			}
 			else
 			{
 				echo lang('firesale:prod_edit_error');
+				exit();
 			}
 
 		}

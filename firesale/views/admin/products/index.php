@@ -10,7 +10,9 @@
 					<ul>
 						<li class="<?php echo alternator('even', ''); ?>">
 							<label for="filter"><?php echo lang('firesale:label_filtercat'); ?></label>
-							<div class="input"><?php echo form_dropdown('filter', $categories, set_value($category, NULL), 'id="filter"'); ?></div>
+							<div class="input">
+								<?php echo form_dropdown('filter', $categories, ( isset($category) ? $category : 0 ), 'id="filter-category" class="filter"'); ?>
+							</div>
 						</li>
 					</ul>
 				</fieldset>
@@ -19,7 +21,11 @@
 	</div>
 	
 <?php if( isset($pagination) ): ?>
-	<?php echo $pagination['links']; ?>
+	<div class="one_half">
+		<div id="shortcuts">
+			<?php echo $pagination['links']; ?>
+		</div>
+	</div>
 <?php endif; ?>
 
 	<section class="title">
@@ -54,7 +60,9 @@
 						<td class="item-id"><?php echo $product['code']; ?></td>
 						<td class="item-img"><img src="<?php echo ( $product['image'] != FALSE ? '/files/thumb/' . $product['image'] . '/32/32' : '' ); ?>" alt="Product Image" /></td>
 						<td class="item-title"><a href="/product/<?php echo $product['slug']; ?>"><?php echo $product['title']; ?></a></td>
-						<td class="item-category"><?php echo $product['category']['title']; ?></td>
+						<td class="item-category">
+							<?php $string = ''; foreach( $product['category'] AS $cat ) { $string .= ( strlen($string) == 0 ? '' : ', ' ) . '<span data-id="' . $cat['id'] . '">' . $cat['title'] . '</span>'; } echo $string; ?>
+						</td>
 						<td class="item-stock"><?php echo $product['stock']; ?></td>
 						<td><?php echo $this->settings->get('currency'); ?><span class="item-price"><?php echo $product['price']; ?></span></td>
 						<td class="actions">
@@ -69,13 +77,17 @@
 
 		</section>
 	
-		<div class="buttons">
+		<div class="buttons one_half">
 			<?php $this->load->view('admin/partials/buttons', array('buttons' => array('delete') )); ?>
+			<button class="btn green" name="btnAction" value="duplicate"><span><?php echo lang('firesale:label_duplicate'); ?></span></button>
 		</div>
+<?php if( isset($pagination) ): ?>
+		<div class="one_half">
+			<div id="shortcuts" class="bottom">
+				<?php echo $pagination['links']; ?>
+			</div>
+		</div>
+<?php endif; ?>
 <?php endif; ?>
 		
 	<?php echo form_close(); ?>
-
-<?php if( isset($pagination) ): ?>
-	<?php echo $pagination['links']; ?>
-<?php endif; ?>

@@ -24,13 +24,17 @@
 								<td><?php echo $gateway['name']; ?></td>
 								<td><?php echo $gateway['desc']; ?></td>
 								<td class="actions">
-									<?php if ($gateway['enabled']): ?>
-										<a class="confirm button small" href="<?php echo site_url('admin/firesale/gateways/disable/'.$gateway['id']); ?>" title="Are you sure you want to disable this gateway? Doing so may make your store unable to take payments.">Disable</a>
-									<?php else: ?>
-										<a class="button small" href="<?php echo site_url('admin/firesale/gateways/enable/'.$gateway['id']); ?>">Enable</a>
+									<?php if ($gateway['enabled'] AND group_has_role('firesale', 'enable_disable_gateways')): ?>
+										<a class="confirm button small" href="<?php echo site_url('admin/firesale/gateways/disable/'.$gateway['id']); ?>" title="<?php echo lang('firesale:gateways:warning'); ?>"><?php echo lang('buttons.disable'); ?></a>
+									<?php elseif (group_has_role('firesale', 'enable_disable_gateways')): ?>
+										<a class="button small" href="<?php echo site_url('admin/firesale/gateways/enable/'.$gateway['id']); ?>"><?php echo lang('buttons.enable'); ?></a>
 									<?php endif; ?>
-									<a class="button small" href="<?php echo site_url('admin/firesale/gateways/edit/'.$gateway['slug']); ?>">Edit</a>
-									<a class="confirm button small" href="<?php echo site_url('admin/firesale/gateways/uninstall/'.$gateway['id']); ?>" title="All gateway settings will be lost and your store may be unable to take payments! Are you sure you want to uninstall this gateway?">Uninstall</a>
+									<?php if (group_has_role('firesale', 'edit_gateways')): ?>
+										<a class="button small" href="<?php echo site_url('admin/firesale/gateways/edit/'.$gateway['slug']); ?>"><?php echo lang('buttons.edit'); ?></a>
+									<?php endif; ?>
+									<?php if (group_has_role('firesale', 'install_uninstall_gateways')): ?>
+										<a class="confirm button small" href="<?php echo site_url('admin/firesale/gateways/uninstall/'.$gateway['id']); ?>" title="<?php echo lang('firesale:gateways:warning'); ?>"><?php echo lang('buttons.uninstall'); ?></a>
+									<?php endif; ?>
 								</td>
 							</tr>
 						<?php endforeach; ?>
@@ -41,15 +45,19 @@
 		<?php endif; ?>
 	</section>
 	<div class="table_action_buttons">
-		<button class="btn red green" value="publish" name="btnAction" type="submit" disabled="">
-			<span>Enable</span>
-		</button>
+		<?php if (group_has_role('firesale', 'enable_disable_gateways')): ?>
+			<button class="btn red green" value="publish" name="btnAction" type="submit" disabled="">
+				<span><?php echo lang('buttons.enable'); ?></span>
+			</button>
 		
-		<button class="btn red orange" value="publish" name="btnAction" type="submit" disabled="">
-			<span>Disable</span>
-		</button>
-				
-		<button class="btn red confirm" value="delete" name="btnAction" type="submit" disabled="">
-			<span>Uninstall</span>
-		</button>
+			<button class="btn red orange" value="publish" name="btnAction" type="submit" disabled="">
+				<span><?php echo lang('buttons.disable'); ?></span>
+			</button>
+		<?php endif; ?>
+		
+		<?php if (group_has_role('firesale', 'install_uninstall_gateways')): ?>
+			<button class="btn red confirm" value="delete" name="btnAction" type="submit" disabled="">
+				<span><?php echo lang('buttons.uninstall'); ?></span>
+			</button>
+		<?php endif; ?>
 	</div>

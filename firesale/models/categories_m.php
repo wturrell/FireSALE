@@ -36,11 +36,17 @@ class Categories_m extends MY_Model {
 		$params	 = array(
 					'stream' 	=> 'firesale_categories',
 					'namespace'	=> 'firesale_categories',
-					'where'		=> ( ( 0 + $id_slug ) > 0 ? 'id = ' : 'slug = ' ) . "'{$id_slug}' AND status = 1",
+					'where'		=> ( ( 0 + $id_slug ) > 0 ? 'id = ' : 'slug = ' ) . "'{$id_slug}'",
 					'limit'		=> '1',
 					'order_by'	=> 'id',
 					'sort'		=> 'desc'
 				   );
+
+		// Add to params if required
+		if( $this->uri->segment('1') != 'admin' )
+		{
+			$params['where'] .= ' AND status = 1';
+		}
 		
 		// Get entries		
 		$category = $this->streams->entries->get_entries($params);
@@ -153,7 +159,7 @@ class Categories_m extends MY_Model {
 	{
 	
 		// Check if we're deleting Category 1
-		if( $cat_id != 1 )
+		if( $id != 1 )
 		{
 
 			// Was it deleted?
@@ -164,7 +170,7 @@ class Categories_m extends MY_Model {
 				$this->db->update('firesale_categories', array('parent' => 1), 'parent = ' . ( 0 + $id ));
 
 				// Add products to root category
-				$this->db->update('firesale_products_firesale_categories', array('parent' => 1));
+				$this->db->update('firesale_products_firesale_categories', array('firesale_categories_id' => 1));
 
 				// Return
 				return TRUE;
@@ -245,6 +251,59 @@ class Categories_m extends MY_Model {
 		
 		// Return
 		return $tree;
+	}
+
+	/**
+	 * Builds the tree for display on the Category
+	 * management page. The string is an HTML list
+	 * structure with sub-lists for the children
+	 * categories.
+	 *
+	 * @param array $cat An array containing the current Category details.
+	 * @param string $tree (Optional) The current html structure that is being built recursivly.
+	 * @param boolean $first (Optional) A boolean to track the first element to echo the output.
+	 * @return string The html tree that is being built
+	 * @access public
+	 */
+	public function tree_builder($cat, $tree = '', $first = true)
+	{
+
+		// Variables
+		if( isset($cat['children']) )
+		{
+
+			foreach($cat['children'] as $cat)
+			{
+
+				$tree .= '<li id="cat_' . $cat['id'] . '">' . "\n";
+				$tree .= '  <div>' . "\n";
+				$tree .= '    <a href="{{ url:base }}category/' . $cat['slug'] . '" rel="' . $cat['id'] . '">' . $cat['title'] . '</a>' . "\n";
+				$tree .= '  </div>' . "\n";
+
+				if( isset($cat['children']) )
+				{
+
+					$tree .= '  <ul>' . "\n";
+					$tree  = $this->tree_builder($cat, $tree, false);
+					$tree .= '  </ul>' . "\n";
+					$tree .= '</li>' . "\n";
+				}
+
+				$tree .= '</li>' . "\n";
+			}
+
+		}
+
+		// Return or echo
+		if( !$first )
+		{
+			return $tree;
+		}	
+		else
+		{
+			echo $tree;
+		}
+
 	}
 	
 	/**

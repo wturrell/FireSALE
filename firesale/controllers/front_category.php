@@ -34,9 +34,12 @@ class Front_category extends Public_Controller {
 		$this->load->model('products_m');
 		$this->load->helper('firesale/general');
 
+		// Get perpage option
+		$this->perpage = $this->settings->get('firesale_perpage');
+
 		// Load css/js
-		$this->template->append_css('module::firesale.css')
-					   ->append_js('module::firesale.js');
+		/*$this->template->append_css('module::firesale.css')
+					   ->append_js('module::firesale.js');*/
 
 	}
 
@@ -128,7 +131,13 @@ class Front_category extends Public_Controller {
 
 			// Build Page
 			$this->template->title($this->data->category['title'])
-						   ->build('category', $this->data);
+						   ->set($this->data);
+
+			// Fire events
+			Events::trigger('page_build', $this->template);
+
+			// Build page
+			$this->template->build('category');
 
 		}
 		else

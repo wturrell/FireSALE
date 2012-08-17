@@ -44,6 +44,7 @@ class Admin_categories extends Admin_Controller
 		$this->load->language('firesale');
 		$this->load->model('categories_m');
 		$this->load->model('products_m');
+		$this->load->helper('general');
 		
 		// Add metadata
 		$this->template->append_css('module::categories.css')
@@ -82,8 +83,15 @@ class Admin_categories extends Admin_Controller
 						'error_message'		=> lang('firesale:cats_' . ( $id == NULL ? 'add' : 'edit' ) . '_error')
 					  );
 					  
-			if( $id != null ) { $input = (object)$input; }
+			if( $id != null ) {
+				$input = (object)$input;
+				$this->data->input = $input;
+			}
 		
+		}
+		else if( $this->input->post('btnAction') == 'delete' )
+		{
+			$this->delete($this->input->post('id'));
 		}
 		else
 		{
@@ -106,8 +114,8 @@ class Admin_categories extends Admin_Controller
 		// Assign variables
 		$this->data->controller =& $this;
 		$this->data->cats       =  $this->categories_m->generate_streams_tree($params);
-		$this->data->fields     =  $this->products_m->fields_to_tabs($fields, $this->tabs);
-		$this->data->tabs		=  array_reverse(array_keys($this->data->fields));
+		$this->data->fields     =  fields_to_tabs($fields, $this->tabs);
+		$this->data->tabs	    =  array_reverse(array_keys($this->data->fields));
 	
 		// Build the page
 		$this->template->title(lang('firesale:title') . ' ' . lang('firesale:sections:categories'))
@@ -170,7 +178,6 @@ class Admin_categories extends Admin_Controller
 		}
 		
 		redirect('admin/firesale/categories');
-	
 	}
 	
 	/**
@@ -192,59 +199,6 @@ class Admin_categories extends Admin_Controller
 			exit();
 		}
 	
-	}
-
-	/**
-	 * Builds the tree for display on the Category
-	 * management page. The string is an HTML list
-	 * structure with sub-lists for the children
-	 * categories.
-	 *
-	 * @param array $cat An array containing the current Category details.
-	 * @param string $tree (Optional) The current html structure that is being built recursivly.
-	 * @param boolean $first (Optional) A boolean to track the first element to echo the output.
-	 * @return string The html tree that is being built
-	 * @access public
-	 */
-	public function tree_builder($cat, $tree = '', $first = true)
-	{
-
-		// Variables
-		if( isset($cat['children']) )
-		{
-
-			foreach($cat['children'] as $cat)
-			{
-
-				$tree .= '<li id="cat_' . $cat['id'] . '">' . "\n";
-				$tree .= '  <div>' . "\n";
-				$tree .= '    <a href="#" rel="' . $cat['id'] . '">' . $cat['title'] . '</a>' . "\n";
-				$tree .= '  </div>' . "\n";
-
-				if( isset($cat['children']) )
-				{
-
-					$tree .= '  <ul>' . "\n";
-					$tree  = $this->tree_builder($cat, $tree, false);
-					$tree .= '  </ul>' . "\n";
-					$tree .= '</li>' . "\n";
-				}
-
-				$tree .= '</li>' . "\n";
-			}
-
-		}
-
-		// Return or echo
-		if( !$first )
-		{
-			return $tree;
-		}	
-		else
-		{
-			echo $tree;
-		}
-
 	}
 
 }

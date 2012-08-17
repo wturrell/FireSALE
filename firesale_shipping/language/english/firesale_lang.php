@@ -6,12 +6,13 @@
 	
 	// Sections
 	$lang['firesale:sections:shipping'] = 'Shipping';
-	$lang['firesale:shipping:title'] 	= 'Shipping (Basic)';
+	$lang['firesale:shipping:title'] 	= 'Shipping Options';
 	$lang['firesale:shipping:create'] 	= 'Create new Shipping Band';
 	$lang['firesale:shipping:edit'] 	= 'Edit "%s" Shipping Band';
 	$lang['firesale:shipping:none']		= 'No Shipping Options Found';
 
 	// Labels
+	$lang['firesale:label_free']		= 'FREE';
 	$lang['firesale:label_save']		= 'Save';
 	$lang['firesale:label_company']		= 'Shipping Carrier';
 	$lang['firesale:label_price_min']	= 'Price (Minimum)';

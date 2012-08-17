@@ -6,18 +6,43 @@
 		<input type="hidden" name="id" id="id" value="<?php echo $id; ?>" />
 
 		<section class="title">
-			<h4>&nbsp;</h4>
 			<ul>
-<?php if( isset($id) && $id > 0 ): ?>
-				<li><a href="#images">Images</a></li>
-<?php endif; ?>
 <?php foreach( $tabs AS $tab ): ?>
-				<li><a href="#<?php echo strtolower(str_replace(' ', '', $tab)); ?>"><?php echo ucwords($tab); ?></a></li>
+<?php if( ( substr($tab, 0, 1) == '_' && isset($id) && $id > 0 ) || substr($tab, 0, 1) != '_' ): ?>
+				<li><a href="#<?php echo strtolower(str_replace(array(' ', '_'), '', $tab)); ?>"><?php echo ucwords(str_replace('_', '', $tab)); ?></a></li>
+<?php endif; ?>
 <?php endforeach; ?>
 			</ul>
 		</section>
 		
 <?php foreach( $fields AS $slug => $field ): ?>
+<?php if( $slug == '_images' && isset($id) && $id > 0 ): ?>
+		<section class="item" id="images">
+			<div id="dropbox">
+			<?php echo ( count($images) > 0 ? '' : '	<span class="message">' . lang('firesale:label_drop_images') . '</span>' ); ?>
+			<?php foreach($images as $image): ?>
+		
+				<div class="preview" id="image-<?php echo $image->id; ?>">
+					<span class="imageHolder">
+						<img src="/files/thumb/<?php echo $image->id; ?>/480/360" />
+					</span>
+					<span class="imageTitle"><?php echo $image->name; ?></span>
+				</div>
+
+			<?php endforeach; ?>
+				<br class="clear" />
+			</div>
+		
+		</section>
+
+<?php elseif( substr($slug, 0, 1) == '_' && isset($id) && $id > 0 ): ?>
+		<section class="item form_inputs" id="<?php echo strtolower(str_replace(array(' ', '_'), '', $slug)); ?>">
+
+			<?php echo $field; ?>
+
+		</section>
+
+<?php elseif( substr($slug, 0, 1) != '_' ): ?>
 		<section class="item form_inputs" id="<?php echo strtolower(str_replace(' ', '', $slug)); ?>">
 
 			<fieldset>
@@ -35,30 +60,11 @@
 	
 		</section>
 
-<?php endforeach; ?>
-<?php if( isset($id) && $id > 0 ): ?>
-
-		<section class="item" id="images">
-		
-			<div id="dropbox">
-			<?php echo ( count($images) > 0 ? '' : '	<span class="message">Drop images here to upload</span>' ); ?>
-			<?php foreach($images as $image): ?>
-		
-				<div class="preview" id="image-<?php echo $image->id; ?>">
-					<span class="imageHolder">
-						<img src="/files/thumb/<?php echo $image->id; ?>/480/360" />
-					</span>
-					<span class="imageTitle"><?php echo $image->name; ?></span>
-				</div>
-
-			<?php endforeach; ?>
-				<br class="clear" />
-			</div>
-		
-		</section>
 <?php endif; ?>
+<?php endforeach; ?>
+
 		<div class="buttons">
-			<?php $this->load->view('admin/partials/buttons', array('buttons' => array('save', 'cancel') )); ?>
+			<?php $this->load->view('admin/partials/buttons', array('buttons' => array('save', 'save_exit', 'cancel') )); ?>
 		</div>
 		
 	<?php echo form_close(); ?>

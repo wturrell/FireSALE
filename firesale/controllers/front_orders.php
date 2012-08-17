@@ -9,6 +9,7 @@ class Front_orders extends Public_Controller
 		
 		// Load models, lang, libraries, etc.
 		$this->load->model('orders_m');
+		$this->load->model('categories_m');
 		$this->load->model('products_m');
 
 	}
@@ -52,13 +53,20 @@ class Front_orders extends Public_Controller
 			$this->template->title(lang('firesale:orders:my_orders'))
 						   ->set_breadcrumb('Home', '/home')
 						   ->set_breadcrumb(lang('firesale:orders:my_orders'), '/users/orders')
-						   ->build('orders', $this->data);
+						   ->set($this->data);
+
+			// Fire events
+			Events::trigger('page_build', $this->template);
+
+			// Build page
+			$this->template->build('orders');
 		
 		}
 		else
 		{
-			// Must be logged in, etc etc.
-			// Redirect to login/register
+			// Must be logged in
+			$this->set_flashdata('error', lang('firesale:orders:logged_in'));
+			redirect('/users/login');
 		}
 	
 	}
@@ -80,9 +88,9 @@ class Front_orders extends Public_Controller
 			$order['price_total'] = number_format($order['price_total'], 2);
 
 			// Format products
-			foreach( $order['items'] AS $key => $item )
+			foreach( $order['items'] AS &$item )
 			{
-				$order['items'][$key]['price'] = number_format($item['price'], 2);
+				$item['price'] = number_format($item['price'], 2);
 			}
 
 			// Build page
@@ -90,14 +98,20 @@ class Front_orders extends Public_Controller
 						   ->set_breadcrumb('Home', '/home')
 						   ->set_breadcrumb(lang('firesale:orders:my_orders'), '/users/orders')
 						   ->set_breadcrumb(sprintf(lang('firesale:orders:view_order'), $id), '/users/orders/' . $id)
-						   ->build('payment_complete', $order);
+						   ->set($order);
+
+			// Fire events
+			Events::trigger('page_build', $this->template);
+
+			// Build page
+			$this->template->build('orders_single');
 
 		}
 		else
 		{
-			// Error
-			// Set flash
-			redirect('/users/orders');
+			// Must be logged in
+			$this->set_flashdata('error', lang('firesale:orders:logged_in'));
+			redirect('/users/login');
 		}
 	
 	}

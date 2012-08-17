@@ -129,15 +129,15 @@ class Admin_orders extends Admin_Controller
 		}
 	
 		// Get the stream fields
-		$fields = $this->fields->build_form($this->stream, ( $id == NULL ? 'new' : 'edit' ), ( $id == NULL ? $input : $row ), FALSE, FALSE, $skip, $extra);
+		$fields = $this->fields->build_form($this->stream, ( $id == NULL ? 'new' : 'edit' ), ( $id == NULL ? (object)$input : $row ), FALSE, FALSE, $skip, $extra);
 
 		// Assign variables
 		if( $row !== NULL ) { $this->data = $row; }
 		$this->data->id		= $id;
 		$this->data->fields = array(
 								'general' => array('details' => $fields),
-								'ship'	  => $this->address_m->get_address_form('ship', ( $row != NULL ? 'edit' : 'new' ), ( $row != NULL ? $this->address_m->get_address($row->ship_to) : NULL )),
-								'bill'	  => $this->address_m->get_address_form('bill', ( $row != NULL ? 'edit' : 'new' ), ( $row != NULL ? $this->address_m->get_address($row->bill_to) : NULL ))
+								'ship'	  => $this->address_m->get_address_form('ship', ( $row != NULL && $row->ship_to > 0 ? 'edit' : 'new' ), ( $row != NULL ? $this->address_m->get_address($row->ship_to) : NULL )),
+								'bill'	  => $this->address_m->get_address_form('bill', ( $row != NULL && $row->bill_to > 0 ? 'edit' : 'new' ), ( $row != NULL ? $this->address_m->get_address($row->bill_to) : NULL ))
 							  );
 
 		// Add users as first general field
@@ -165,6 +165,8 @@ class Admin_orders extends Admin_Controller
 
 	public function edit($id)
 	{
+		// Does the user have access?
+		role_or_die('firesale', 'edit_orders');
 		
 		// Get row
 		if( $row = $this->row_m->get_row($id, $this->stream, FALSE) )
@@ -229,7 +231,7 @@ class Admin_orders extends Admin_Controller
 				}
 				else
 				{
-					$this->db->where('id', $order)->update('firesale_orders', array('status' => $status));
+					$this->db->where('id', $order)->update('firesale_orders', array('order_status' => $status));
 				}
 			}
 

@@ -8,6 +8,9 @@ class Admin_gateways extends Admin_Controller
 	{
 		parent::__construct();
 		
+		// Does the user have access?
+		role_or_die('firesale', 'access_gateways');
+		
 		// Load the payments library
 		$this->load->library('gateways');
 		
@@ -17,7 +20,7 @@ class Admin_gateways extends Admin_Controller
 	
 	// Show installed
 	public function index()
-	{
+	{		
 		$data['gateways'] = $this->gateways->get_installed();
 
 		// Build the page
@@ -28,6 +31,9 @@ class Admin_gateways extends Admin_Controller
 	// Show uninstalled
 	public function add()
 	{
+		// Does the user have access?
+		role_or_die('firesale', 'install_uninstall_gateways');
+		
 		$data['gateways'] = $this->gateways->get_uninstalled();
 
 		$this->template->build('admin/gateways/install', $data);
@@ -35,6 +41,9 @@ class Admin_gateways extends Admin_Controller
 
 	public function install($slug)
 	{
+		// Does the user have access?
+		role_or_die('firesale', 'install_uninstall_gateways');
+		
 		$fields = $this->gateways->get_setting_fields($slug);
 		$rules = array(
 			array(
@@ -82,9 +91,11 @@ class Admin_gateways extends Admin_Controller
 			if ($this->form_validation->run())
 			{
 				$data = array(
-					'slug'	=> $slug,
-					'name'	=> set_value('name'),
-					'desc'	=> set_value('desc')
+					'created' 		 => date("Y-m-d H:i:s"),
+					'ordering_count' => 0,
+					'slug'			 => $slug,
+					'name'			 => set_value('name'),
+					'desc'			 => set_value('desc')
 				);
 				
 				$this->db->trans_begin();
@@ -152,6 +163,9 @@ class Admin_gateways extends Admin_Controller
 	
 	public function disable($id)
 	{
+		// Does the user have access?
+		role_or_die('firesale', 'enable_disable_gateways');
+		
 		if ($this->db->update('firesale_gateways', array('enabled' => 0), array('id' => (int)$id)))
 		{
 			$this->session->set_flashdata('success', 'The gateway has been disabled');
@@ -166,6 +180,9 @@ class Admin_gateways extends Admin_Controller
 	
 	public function uninstall($id)
 	{
+		// Does the user have access?
+		role_or_die('firesale', 'install_uninstall_gateways');
+		
 		$this->db->trans_begin();
 		$this->db->delete('firesale_gateways', array('id' => (int)$id));
 		$this->db->delete('firesale_gateway_settings', array('id' => (int)$id));
@@ -186,6 +203,9 @@ class Admin_gateways extends Admin_Controller
 	
 	public function edit($slug)
 	{
+		// Does the user have access?
+		role_or_die('firesale', 'edit_gateways');
+		
 		$query = $this->db->get_where('firesale_gateways', array('slug' => $slug));
 		
 		if ($query->num_rows())
