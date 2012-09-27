@@ -9,18 +9,6 @@ class Categories_m extends MY_Model {
 	 * @access public
 	 */
     public $_table = 'firesale_categories';
-	
-	/**
-	 * Loads the parent constructor and gets an
-	 * instance of CI.
-	 *
-	 * @return void
-	 * @access public
-	 */
-	function __construct()
-    {
-        parent::__construct();
-    }
 
 	/**
 	 * Gets the category via id or slug via streams
@@ -107,7 +95,7 @@ class Categories_m extends MY_Model {
     						 ->join('firesale_products', 'firesale_products.id = firesale_products_firesale_categories.row_id', 'inner')
     						 ->join('firesale_categories', 'firesale_categories.id = firesale_products_firesale_categories.firesale_categories_id', 'inner')
     						 ->where('firesale_products.status', 1)
-    						 ->group_by('firesale_products.id');
+    						 ->group_by('firesale_products.slug');
 
     	// Has children?
     	if( !empty($children) )

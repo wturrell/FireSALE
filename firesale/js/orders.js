@@ -3,12 +3,6 @@ $(function() {
 	// Index
 	$('#filters select[name=created_by]').change(function() { window.location = '/admin/firesale/orders/created_by/' + $(this).val(); });
 
-	// Create
-	$('#tabs').tabs();
-	if( !window.location.hash ) {
-		$('#tabs').tabs("select", '#general');
-	}
-
 	$('#price_sub, #price_ship, #price_total').before('<span>' + currency + '&nbsp;</span>');
 
 	// Change address
@@ -27,6 +21,21 @@ $(function() {
 				notif('error', 'Error retrieving address');
 			}
 		});
+	});
+
+	// Link addresses
+	var linked = false;
+	$('#ship fieldset ul:last').append('<li class="wide"><label for="bill_details_same">My Billing and Shipping addresses are the same.</label><input type="checkbox" name="bill_details_same" id="bill_details_same" value="yes" /></li>');
+	$('#bill_details_same').change(function() {
+		if( $(this).attr('checked') == 'checked' ) { checked = true; } else { checked = false; }
+		if( checked == true ) {
+			$(this).parents('fieldset').find('li input').each(function() {
+				if( typeof $(this).attr('name') != 'undefined' )
+				{
+					$('input[name=' + $(this).attr('name').replace('ship_', 'bill_') + ']').val($(this).val());
+				}
+			});
+		}
 	});
 
 	// Add product
@@ -51,10 +60,11 @@ $(function() {
 						}
 						else
 						{
-							$('table.cart tbody').append(
+							$('.no_data').remove();
+							$('table.cart').removeAttr('style').find('tbody').append(
 								'<tr>' +
 									'<td class="remove"><input type="checkbox" name="item[' + d.id + '][remove]" value="1" /></td>' +
-             						'<td class="image">n/a</td>' +
+             						'<td class="image"><img src="/files/thumb/' + d.image + '/64/64" alt="Product Image" class="image" /></td>' +
               						'<td class="name"><a href="/product/' + d.slug + '">' + d.title + '</a></td>' +
               						'<td class="model">' + d.code + '</td>' +
               						'<td><input type="text" name="item[' + d.id + '][qty]" value="' + r.qty + '" /></td>' + 
@@ -63,7 +73,7 @@ $(function() {
 								'</tr>'
 							);
 						}
-						caclulatePrice();
+						calculatePrice();
 					}
 					else
 					{

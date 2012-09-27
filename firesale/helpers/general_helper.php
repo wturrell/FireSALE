@@ -1,10 +1,20 @@
 <?php
 
+	/**
+	 * Detects if a given module is currently installed
+	 *
+	 * @param string $module A module slug to query
+	 * @return boolean TRUE or FALSE on installed or not
+	 * @access public
+	 */
 	function is_module_installed($module)
 	{
 
+		// Get instance
+		$_CI =& get_instance();
+
 		// Ensure core is installed first
-		$query = $this->db->select('id')->where("slug = '{$module}' AND installed = 1")->get('modules');
+		$query = $_CI->db->select('id')->where("slug = '{$module}' AND installed = 1")->get('modules');
 
 		// Check query
 		if( $query->num_rows() )
@@ -13,6 +23,26 @@
 		}
 
 		return FALSE;
+	}
+
+	/**
+	 * Truncates a string by a number of characters but ensures to complete the
+	 * last word, following by "..."
+	 *
+	 * @param string $string The string to truncate
+	 * @param integer $length (Optional) The character count to limit to
+	 * @return string The truncated string
+	 * @access public
+	 */
+	function truncate_words($string, $length = 140)
+	{
+
+		if( strlen($string) > $length )
+		{
+			$string = substr( $string, 0, strrpos( substr( $string, 0, $length), ' ' ) ) . '...';
+		}
+
+		return $string;
 	}
 
 	/**
@@ -25,7 +55,7 @@
 	 * @return array
 	 * @access public
 	 */
-	function fields_to_tabs($fields, $tabs, $default = 'general options')
+	function fields_to_tabs($fields, $tabs, $default = 'general')
 	{
 	
 		// Variables
@@ -69,6 +99,14 @@
 		return $data;	
 	}
 
+	/**
+	 * Returns the available ordering options for products or the requested order
+	 * according to a specified ID (array key)
+	 *
+	 * @param integer $id (Optional) The key for a given item in the order array
+	 * @return array Either one or all of the ordering options
+	 * @access public
+	 */ 
 	function get_order($id = NULL)
 	{
 		
@@ -94,6 +132,14 @@
 		return $_ORDER;
 	}
 	
+	/**
+	 * Generates a "twitter-like" time string displaying how long ago since a given
+	 * unix time occured.
+	 *
+	 * @param integer $time A unix timestamp
+	 * @return string
+	 * @access public
+	 */
 	function nice_time($time) {
 	
 		$delta = ( time() - $time );

@@ -10,6 +10,9 @@ class Admin_orders extends Admin_Controller
 	{
 
 		parent::__construct();
+
+		// CH: Instantiate the StdClass object to fix E_STRICT errors
+		$this->data = new StdClass;
 		
 		// Load the models
 		$this->load->model('orders_m');
@@ -113,11 +116,29 @@ class Admin_orders extends Admin_Controller
 
 			}
 
+			// Check for address
+			if( !isset($input['shipping']) OR $input['shipping'] == NULL )
+			{
+				$input['shipping'] = '0';
+				$_POST = $input;
+			}
+
+			// Create hash
+			list($ship_hash, $bill_hash) = $this->address_m->input_hash($input);
+
 			// Check for addresses
 			$ship = $this->address_m->update_address($input['ship_to'], $input, 'ship');
-			if( $ship != TRUE OR $input['ship_to'] != $input['bill_to'] )
+			if( $ship != TRUE OR $ship <= 0 OR $input['ship_to'] != $input['bill_to'] OR $ship_hash != $bill_hash )
 			{
-				$this->address_m->update_address($input['bill_to'], $input, 'bill');
+				$bill = $this->address_m->update_address($input['bill_to'], $input, 'bill');
+			}
+
+			// Did we insert them?
+			if( $ship > 0 OR $bill > 0 )
+			{
+				$input['ship_to'] = $ship;
+				$input['bill_to'] = ( isset($bill) ? $bill : $ship );
+				$_POST = $input;
 			}
 
 		}
@@ -154,7 +175,7 @@ class Admin_orders extends Admin_Controller
 		if( $id != NULL )
 		{
 			$products = $this->orders_m->order_products($id);
-			$this->data->products = $products['products'];
+			$this->data->products  = $products['products'];
 			$this->data->prod_drop = $this->products_m->build_dropdown();
 		}
 			
@@ -198,7 +219,7 @@ class Admin_orders extends Admin_Controller
 		// Redirect?
 		if( !$this->input->post('btnAction') )
 		{
-			redirect('/admin/firesale/orders');
+			redirect('admin/firesale/orders');
 		}
 
 	}
@@ -231,18 +252,19 @@ class Admin_orders extends Admin_Controller
 				}
 				else
 				{
-					$this->db->where('id', $order)->update('firesale_orders', array('order_status' => $status));
+					$this->orders_m->update_status($order, $status);
 				}
 			}
 
 		}
 
 		// Redirect
-		redirect('/admin/firesale/orders');
+		redirect('admin/firesale/orders');
 	}
 
 	public function ajax_add_product($order, $id, $qty)
 	{
+
 		if( $this->input->is_ajax_request() )
 		{
 			// Get product
@@ -255,31 +277,30 @@ class Admin_orders extends Admin_Controller
 				$this->orders_m->update_order_cost($order, TRUE, FALSE);
 
 				// Return to the browser
-				$qty = ( $qty > $product['stock'] ? $product['stock'] : $qty );
+				$qty = ( $product['stock_status']['key'] != 6 && $qty > $product['stock'] ? $product['stock'] : $qty );
 				$data = array('qty' => $qty, 'price' => $product['price'], 'total' => number_format(( $qty * $product['price']), 2));
 				echo json_encode($data);
 				exit();
 			}
-			else
-			{
-				echo 'false';
-				exit();
-			}
 		}
+
+		echo 'false';
+		exit();
 	}
 
 	public function ajax_get_address($user, $id)
 	{
-		/*if( $this->input->is_ajax_request() )
-		{*/
+
+		if( $this->input->is_ajax_request() )
+		{
 			// Get Address
 			$address = $this->address_m->get_address($id, $user);
 			echo json_encode($address);
 			exit();
-		/*}
+		}
 
 		echo 'false';
-		exit();*/
+		exit();
 	}
 	
 }

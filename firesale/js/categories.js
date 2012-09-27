@@ -24,8 +24,8 @@ $(function(){
 		$.getJSON(SITE_URL + 'admin/firesale/categories/ajax_cat_details/' + $details_id.val(), function(data) {
 
 			$('button.delete').remove();
-			$('.form_inputs').parent().parent().find('h4').text('Edit ' + data.title);
-			$('.form_inputs input[name=id]').val(data.id);
+			$('.one_half.last .title h4').text('Edit "' + data.title + '"');
+			$('#tabs input[name=id]').val(data.id);
 			$('.form_inputs input[name=title]').val(data.title);
 			$('.form_inputs input[name=slug]').val(data.slug);
 			if( data.parent != null ) { $('.form_inputs select[name=parent]').val(data.parent.id).trigger('liszt:updated'); }
@@ -56,5 +56,7 @@ $(function(){
 	}
 
 	pyro.sort_tree($item_list, $url, $cookie, data_callback, post_sort_callback);
+	
+	pyro.generate_slug($('input[name=title]'), $('input[name=slug]'), '-');
 	
 });

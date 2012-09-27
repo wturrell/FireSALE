@@ -24,7 +24,7 @@ class Front_product extends Public_Controller {
 		$product = $this->products_m->get_product($product);
 		
 		// Check it exists
-		if( $product )
+		if( $product !== FALSE )
 		{
 		
 			// General information
@@ -57,6 +57,8 @@ class Front_product extends Public_Controller {
 		
 			// Build Page
 			$this->template->set_breadcrumb($this->data->product['title'], '/product/' . $this->data->product['slug'])
+						   ->append_css('module::firesale.css')
+					   	   ->append_js('module::firesale.js')
 						   ->title($this->data->product['title'])
 						   ->set($this->data);
 

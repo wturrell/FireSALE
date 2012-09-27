@@ -11,7 +11,7 @@ class Admin_gateways extends Admin_Controller
 		// Does the user have access?
 		role_or_die('firesale', 'access_gateways');
 		
-		// Load the payments library
+		// Load the gateways library
 		$this->load->library('gateways');
 		
 		// Add metadata
@@ -20,7 +20,20 @@ class Admin_gateways extends Admin_Controller
 	
 	// Show installed
 	public function index()
-	{		
+	{
+		if ($this->input->post('btnAction') == 'enable')
+		{
+			$this->enable();
+		}
+		elseif ($this->input->post('btnAction') == 'disable')
+		{
+			$this->disable();
+		}
+		elseif ($this->input->post('btnAction') == 'uninstall')
+		{
+			$this->uninstall();
+		}
+		
 		$data['gateways'] = $this->gateways->get_installed();
 
 		// Build the page
@@ -61,7 +74,7 @@ class Admin_gateways extends Admin_Controller
 		);
 		
 		$this->lang->load('gateways');
-		$values['name'] = lang('firesale:gateways:'.$slug.':name');
+		$values['name'] = lang('firesale:gateways:'.$slug.':name') ? lang('firesale:gateways:'.$slug.':name') : ucwords(str_replace('_', ' ', $slug));
 		$values['desc'] = lang('firesale:gateways:'.$slug.':desc');
 
 		if (is_array($fields))
@@ -117,19 +130,19 @@ class Admin_gateways extends Admin_Controller
 				if ($this->db->trans_status() !== FALSE)
 				{
 					$this->db->trans_commit();
-					$this->session->set_flashdata('success', set_value('name').' was successfully installed');
+					$this->session->set_flashdata('success', lang('firesale:gateways:installed_success'));
 					redirect('admin/firesale/gateways');
 				}
 				else
 				{
 					$this->db->trans_rollback();
-					$this->session->set_flashdata('error', set_value('name').' could not be installed');
+					$this->session->set_flashdata('error', lang('firesale:gateways:installed_fail'));
 					redirect('admin/firesale/gateways/add');
 				}
 			}
 			else
 			{
-				$this->template->build('admin/gateways/edit', array('fields' => $rules, 'values' => $values));
+				$this->template->build('admin/gateways/install_form', array('fields' => $rules, 'values' => $values));
 			}
 		}
 		else
@@ -147,58 +160,128 @@ class Admin_gateways extends Admin_Controller
 		return FALSE;
 	}
 	
-	public function enable($id)
+	public function enable($id = NULL)
 	{
-		if ($this->db->update('firesale_gateways', array('enabled' => 1), array('id' => (int)$id)))
+		// Does the user have access?
+		role_or_die('firesale', 'enable_disable_gateways');
+
+		if ($id === NULL)
 		{
-			$this->session->set_flashdata('success', 'The gateway has been enabled');
-			redirect('admin/firesale/gateways');
+			$this->db->trans_start();
+
+			foreach ($this->input->post('action_to') as $id)
+				$this->db->update('firesale_gateways', array('enabled' => 1), array('id' => (int)$id));
+
+			$this->db->trans_complete();
+
+			if ($this->db->trans_status() === FALSE)
+			{
+				$this->session->set_flashdata('error', lang('firesale:gateways:multiple_enabled_fail'));
+			}
+			else
+			{
+				$this->session->set_flashdata('success', lang('firesale:gateways:multiple_enabled_success'));
+			}
 		}
 		else
 		{
-			$this->session->set_flashdata('error', 'That gateway could not be enabled');
-			redirect('admin/firesale/gateways');
+			if ($this->db->update('firesale_gateways', array('enabled' => 1), array('id' => (int)$id)))
+			{
+				$this->session->set_flashdata('success', lang('firesale:gateways:enabled_success'));
+			}
+			else
+			{
+				$this->session->set_flashdata('error', lang('firesale:gateways:enabled_fail'));
+			}
 		}
+
+		redirect('admin/firesale/gateways');
 	}
 	
-	public function disable($id)
+	public function disable($id = NULL)
 	{
 		// Does the user have access?
 		role_or_die('firesale', 'enable_disable_gateways');
 		
-		if ($this->db->update('firesale_gateways', array('enabled' => 0), array('id' => (int)$id)))
+		if ($id === NULL)
 		{
-			$this->session->set_flashdata('success', 'The gateway has been disabled');
-			redirect('admin/firesale/gateways');
+			$this->db->trans_start();
+
+			foreach ($this->input->post('action_to') as $id)
+				$this->db->update('firesale_gateways', array('enabled' => 0), array('id' => (int)$id));
+
+			$this->db->trans_complete();
+
+			if ($this->db->trans_status() === FALSE)
+			{
+				$this->session->set_flashdata('error', lang('firesale:gateways:multiple_disabled_fail'));
+			}
+			else
+			{
+				$this->session->set_flashdata('success', lang('firesale:gateways:multiple_disabled_success'));
+			}
 		}
 		else
 		{
-			$this->session->set_flashdata('error', 'That gateway could not be disabled');
-			redirect('admin/firesale/gateways');
+			if ($this->db->update('firesale_gateways', array('enabled' => 0), array('id' => (int)$id)))
+			{
+				$this->session->set_flashdata('success', lang('firesale:gateways:disabled_success'));
+			}
+			else
+			{
+				$this->session->set_flashdata('error', lang('firesale:gateways:multiple_disabled_fail'));
+			}
 		}
+
+		redirect('admin/firesale/gateways');
 	}
 	
-	public function uninstall($id)
+	public function uninstall($id = NULL)
 	{
 		// Does the user have access?
 		role_or_die('firesale', 'install_uninstall_gateways');
 		
-		$this->db->trans_begin();
-		$this->db->delete('firesale_gateways', array('id' => (int)$id));
-		$this->db->delete('firesale_gateway_settings', array('id' => (int)$id));
-		
-		if ($this->db->trans_status() !== FALSE)
+		if ($id === NULL)
 		{
-			$this->db->trans_commit();
-			$this->session->set_flashdata('success', 'The gateway has been uninstalled');
-			redirect('admin/firesale/gateways');
+			$this->db->trans_start();
+
+			foreach ($this->input->post('action_to') as $id)
+			{
+				$this->db->delete('firesale_gateways', array('id' => (int)$id));
+				$this->db->delete('firesale_gateway_settings', array('id' => (int)$id));
+			}
+
+			$this->db->trans_complete();
+
+			if ($this->db->trans_status() === FALSE)
+			{
+				$this->session->set_flashdata('error', lang('firesale:gateways:multiple_uninstalled_fail'));
+			}
+			else
+			{
+				$this->session->set_flashdata('success', lang('firesale:gateways:multiple_uninstalled_success'));
+			}
 		}
 		else
 		{
-			$this->db->trans_rollback();
-			$this->session->set_flashdata('error', 'That gateway could not be uninstalled');
-			redirect('admin/firesale/gateways');
+			$this->db->trans_start();
+
+			$this->db->delete('firesale_gateways', array('id' => (int)$id));
+			$this->db->delete('firesale_gateway_settings', array('id' => (int)$id));
+
+			$this->db->trans_complete();
+
+			if ($this->db->trans_status() === FALSE)
+			{
+				$this->session->set_flashdata('error', lang('firesale:gateways:uninstalled_fail'));
+			}
+			else
+			{
+				$this->session->set_flashdata('success', lang('firesale:gateways:uninstalled_success'));
+			}
 		}
+
+		redirect('admin/firesale/gateways');
 	}
 	
 	public function edit($slug)
@@ -210,6 +293,7 @@ class Admin_gateways extends Admin_Controller
 		
 		if ($query->num_rows())
 		{
+
 			$values['name'] = $query->row()->name;
 			$values['desc'] = $query->row()->desc;
 											
@@ -231,6 +315,9 @@ class Admin_gateways extends Admin_Controller
 	
 			if (is_array($fields))
 			{
+
+				$additional_fields = array();
+
 				foreach ($fields as $field)
 				{
 					$values[$field['slug']] = $this->gateways->setting($slug, $field['slug']);
@@ -293,13 +380,13 @@ class Admin_gateways extends Admin_Controller
 					if ($this->db->trans_status() !== FALSE)
 					{
 						$this->db->trans_commit();
-						$this->session->set_flashdata('success', set_value('name').' was successfully updated');
+						$this->session->set_flashdata('success', lang('firesale:gateways:updated_success'));
 						redirect('admin/firesale/gateways');
 					}
 					else
 					{
 						$this->db->trans_rollback();
-						$this->session->set_flashdata('error', set_value('name').' could not be updated');
+						$this->session->set_flashdata('error', lang('firesale:gateways:updated_fail'));
 						redirect('admin/firesale/gateways');
 					}
 				}

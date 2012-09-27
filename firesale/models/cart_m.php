@@ -4,18 +4,6 @@ class Cart_m extends MY_Model
 {
 
 	/**
-	 * Loads the parent constructor and gets an
-	 * instance of CI.
-	 *
-	 * @return void
-	 * @access public
-	 */
-	function __construct()
-    {
-        parent::__construct();
-    }
-
-	/**
 	 * Ensures that the product quanities that have been added to a cart are within
 	 * the allowed limits of what is currently in stock.
 	 *
@@ -27,21 +15,25 @@ class Cart_m extends MY_Model
 	public function check_quantity($products, $qty)
 	{
 
+		$changed = FALSE;
+
 		foreach( $products AS $rowid => $product )
 		{
 			if( array_key_exists($product['id'], $qty) )
 			{
 				if( (int)$qty[$product['id']] < (int)$product['qty'] )
 				{
+					$changed 		  = TRUE;
 					$data 		   	  = array();
 					$data['rowid']    = $rowid;
 					$data['qty']   	  = $qty[$product['id']];
 					$data['subtotal'] = number_format(( $data['qty'] * $product['price'] ), 2);
-					$this->cart->update($data);
+					$this->fs_cart->update($data);
 				}
 			}
 		}
 
+		return $changed;
 	}
 
 	/**
@@ -124,15 +116,15 @@ class Cart_m extends MY_Model
 		{
 
 			// Cart contents
-			$response['products'] = $this->cart->contents();
+			$response['products'] = $this->fs_cart->contents();
 
 			// Update cart pricing
 			$this->orders_m->update_order_cost(0, FALSE);
 
 			// Add pricing
-			$response['total'] 		= $this->cart->total;
-			$response['tax']   		= $this->cart->tax;
-			$response['subtotal']	= $this->cart->subtotal;
+			$response['total'] 		= $this->fs_cart->total;
+			$response['tax']   		= $this->fs_cart->tax;
+			$response['subtotal']	= $this->fs_cart->subtotal;
 
 		}
 
@@ -156,7 +148,7 @@ class Cart_m extends MY_Model
 		$data = array(
 					'id'	=> $product['id'],
 					'code'	=> $product['code'],
-					'qty'	=> ( $qty > $product['stock'] ? $product['stock'] : $qty ),
+					'qty'	=> ( $qty > $product['stock'] && $product['stock_status']['key'] != 6 ? $product['stock'] : $qty ),
 					'price'	=> $product['price'],
 					'name'	=> $product['title'],
 					'slug'	=> $product['slug'],
@@ -165,6 +157,55 @@ class Cart_m extends MY_Model
 				);
 
 		return $data;
+	}
+
+	/**
+	 * A secure check to see if a user has an active order that is not
+	 * complete.
+	 *
+	 * @return bool
+	 * @access public
+	 */
+	public function cart_has_order()
+	{
+		if ($order_id = $this->session->userdata('order_id'))
+		{
+			// Load the orders model if its not already loaded
+			$this->load->model('orders_m');
+
+			$order = $this->orders_m->get_order_by_id($order_id);
+
+			// Are there any items in the order?
+			if (empty($order['items']))
+			{
+				// Nope, delete the order.
+				$this->orders_m->delete_order($order_id);
+
+				// Remove the order id from session.
+				$this->session->unset_userdata('order_id');
+
+				// Return FALSE, we have no order now.
+				return FALSE;
+			}
+
+			// Is the order unpaid?
+			if ($order['order_status']['key'] == 1)
+			{
+				return TRUE;
+			}
+			else
+			{
+				// Remove the order id from session.
+				$this->session->unset_userdata('order_id');
+
+				// Return FALSE, we have no order.
+				return FALSE;
+			}
+		}
+		else
+		{
+			return FALSE;
+		}
 	}
 
 	/**
@@ -179,6 +220,7 @@ class Cart_m extends MY_Model
 	 */
 	public function sale_complete($order)
 	{
+
 		// Update this order status
 		$this->orders_m->update_status($order['id'], 2);
 

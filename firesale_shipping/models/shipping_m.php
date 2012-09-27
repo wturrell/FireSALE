@@ -3,6 +3,10 @@
 class Shipping_m extends MY_Model
 {
 
+	public $fired  = array(
+						'form_build' => FALSE
+					);
+
 	public function get_option_by_id($id)
 	{
 
@@ -106,4 +110,5 @@ class Shipping_m extends MY_Model
 		}
 	
 	}
+
 }

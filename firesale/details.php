@@ -2,7 +2,7 @@
 
 class Module_Firesale extends Module {
 	
-	public $version = '0.9.7';
+	public $version = '1.0.4';
 	public $language_file = 'firesale/firesale';
 	
 	public function __construct()
@@ -18,12 +18,14 @@ class Module_Firesale extends Module {
 
 		$info = array(
 			'name' => array(
-				'en' => 'FireSALE',
-				'it' => 'FireSALE'
+				'en' => 'FireSale',
+				'it' => 'FireSale', 
+				'fr' => 'FireSale'
 			),
 			'description' => array(
-				'en' => 'The lightweight eCommerce platform for PyroCMS',
-				'it' => 'Una leggera piattaforma eCommerce per PyroCMS'
+				'en' => 'The lightweight & extensible eCommerce platform for PyroCMS',
+				'it' => 'Una leggera piattaforma eCommerce per PyroCMS',
+				'fr' => 'Plateforme eCommerce pour PyroCMS'
 			),
 			'frontend'		=> TRUE,
 			'backend'		=> TRUE,
@@ -70,11 +72,7 @@ class Module_Firesale extends Module {
 						    'class' => 'add'
 						)
 				    )
-				),
-				'settings' => array(
-					'name' => 'firesale:sections:settings',
-					'uri'  => 'admin/settings#firesale'
-				),
+				)
 			),
 			'elements' => array(
 				'dashboard' => array(
@@ -101,16 +99,16 @@ class Module_Firesale extends Module {
 		
 		if (group_has_role('firesale', 'access_gateways'))
 		{
-			$info['sections']['payments'] = array(
+			$info['sections']['gateways'] = array(
 				'name' => 'firesale:sections:gateways',
 				'uri'  => 'admin/firesale/gateways',
 				'shortcuts' => array()
 			);
 		}
 		
-		if (group_has_role('firesale', 'install_uninstall_gateways') AND isset($info['sections']['payments']))
+		if (group_has_role('firesale', 'install_uninstall_gateways') AND isset($info['sections']['gateways']))
 		{
-			$info['sections']['payments']['shortcuts'] = array(
+			$info['sections']['gateways']['shortcuts'] = array(
 				array(
 					'name' 	=> 'firesale:shortcuts:install_gateway',
 					'uri'	=> 'admin/firesale/gateways/add',
@@ -127,7 +125,7 @@ class Module_Firesale extends Module {
 		
 		// Load required items
 		$this->load->driver('Streams');
-		$this->load->language('firesale/firesale');
+		$this->load->language($this->language_file);
 		$this->load->model('firesale/categories_m');
 		$this->load->model('firesale/products_m');
 		$this->load->library('files/files');
@@ -185,9 +183,9 @@ class Module_Firesale extends Module {
 		$fields[] = array('name' => 'lang:firesale:label_title', 'slug' => 'title', 'type' => 'text', 'title_column' => TRUE, 'extra' => array('max_length' => 255), 'unique' => TRUE);
 		$fields[] = array('name' => 'lang:firesale:label_slug', 'slug' => 'slug', 'type' => 'slug', 'extra' => array('max_length' => 255, 'slug_field' => 'title', 'space_type' => '-'));
 		$fields[] = array('name' => 'lang:firesale:label_category', 'slug' => 'category', 'type' => 'multiple', 'extra' => array('choose_stream' => $categories->id), 'required' => FALSE);
-		$fields[] = array('name' => 'lang:firesale:label_rrp', 'slug' => 'rrp', 'type' => 'text', 'extra' => array('max_length' => 10, 'pattern' => '^\d+(?:,\d{3})*\.\d{2}$'));
+		$fields[] = array('name' => 'lang:firesale:label_rrp', 'slug' => 'rrp', 'type' => 'text', 'instructions' => 'lang:firesale:inst_rrp', 'extra' => array('max_length' => 10, 'pattern' => '^\d+(?:,\d{3})*\.\d{2}$'));
 		$fields[] = array('name' => 'lang:firesale:label_rrp_tax', 'slug' => 'rrp_tax', 'type' => 'text', 'extra' => array('max_length' => 10, 'pattern' => '^\d+(?:,\d{3})*\.\d{2}$'));
-		$fields[] = array('name' => 'lang:firesale:label_price', 'slug' => 'price', 'type' => 'text', 'extra' => array('max_length' => 10, 'pattern' => '^\d+(?:,\d{3})*\.\d{2}$'));
+		$fields[] = array('name' => 'lang:firesale:label_price', 'slug' => 'price', 'type' => 'text', 'instructions' => 'lang:firesale:inst_price', 'extra' => array('max_length' => 10, 'pattern' => '^\d+(?:,\d{3})*\.\d{2}$'));
 		$fields[] = array('name' => 'lang:firesale:label_price_tax', 'slug' => 'price_tax', 'type' => 'text', 'extra' => array('max_length' => 10, 'pattern' => '^\d+(?:,\d{3})*\.\d{2}$'));
 		$fields[] = array('name' => 'lang:firesale:label_status', 'slug' => 'status', 'type' => 'choice', 'extra' => array('choice_data' => "0 : lang:firesale:label_draft\n1 : lang:firesale:label_live", 'choice_type' => 'dropdown', 'default_value' => 1));
 		$fields[] = array('name' => 'lang:firesale:label_stock', 'slug' => 'stock', 'type' => 'integer');
@@ -340,6 +338,22 @@ class Module_Firesale extends Module {
 
 		// Add fields to stream
 		$this->streams->fields->add_fields($fields);
+
+		##################
+		## TRANSACTIONS ##
+		##################
+
+		$this->db->query("
+			CREATE TABLE IF NOT EXISTS `".SITE_REF."_firesale_transactions` (
+			  `txn_id` varchar(50) NOT NULL,
+			  `order_id` int(11) NOT NULL,
+			  `gateway` varchar(100) NOT NULL,
+			  `amount` decimal(10,2) NOT NULL,
+			  `message` text NOT NULL,
+			  `status` varchar(100) NOT NULL,
+			  PRIMARY KEY  (`txn_id`)
+			) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+		");
 		
 		###########
 		## OTHER ##
@@ -392,6 +406,7 @@ class Module_Firesale extends Module {
 		$this->dbforge->drop_table('firesale_products_firesale_categories'); // Streams doesn't auto-remove it =/
 		$this->dbforge->drop_table('firesale_gateway_settings');
 		$this->dbforge->drop_table('firesale_order_items');
+		$this->dbforge->drop_table('firesale_transactions');
 
 		// Return
 		return TRUE;
@@ -399,10 +414,24 @@ class Module_Firesale extends Module {
 
 	public function upgrade($old_version)
 	{
+		if ($old_version == '0.9.7')
+		{
+			// Currency Code
+			$settings = array(
+				'slug' 		  	=> 'firesale_currency',
+				'title' 	  	=> 'Currency Code',
+				'description' 	=> 'The currency you accept (ISO-4217 format)',
+				'default'		=> 'GBP',
+				'value'			=> 'GBP',
+				'type' 			=> 'text',
+				'options'		=> '',
+				'is_required' 	=> 1,
+				'is_gui'		=> 1,
+				'module' 		=> 'firesale'
+			);
 
-		// Add settings
-		$this->settings('remove');
-		$this->settings('add');
+			return $this->db->insert('settings', $settings);
+		}
 
 		return TRUE;
 	}
@@ -434,6 +463,20 @@ class Module_Firesale extends Module {
 			'module' 		=> 'firesale'
 		);
 
+		// Currency Code
+		$settings[] = array(
+			'slug' 		  	=> 'firesale_currency',
+			'title' 	  	=> 'Currency Code',
+			'description' 	=> 'The currency you accept (ISO-4217 format)',
+			'default'		=> 'GBP',
+			'value'			=> 'GBP',
+			'type' 			=> 'text',
+			'options'		=> '',
+			'is_required' 	=> 1,
+			'is_gui'		=> 1,
+			'module' 		=> 'firesale'
+		);
+
 		// Products Per Page
 		$settings[] = array(
 			'slug' 		  	=> 'firesale_perpage',
@@ -443,20 +486,6 @@ class Module_Firesale extends Module {
 			'value'			=> '15',
 			'type' 			=> 'text',
 			'options'		=> '',
-			'is_required' 	=> 1,
-			'is_gui'		=> 1,
-			'module' 		=> 'firesale'
-		);
-		
-		// Top-level routes
-		$settings[] = array(
-			'slug' 		  	=> 'routes_installed',
-			'title' 	  	=> 'Routes Installed',
-			'description' 	=> 'Have the suggested top-level routes been installed?',
-			'default'		=> '0',
-			'value'			=> '0',
-			'type' 			=> 'select',
-			'options'		=> '1=Yes|0=No',
 			'is_required' 	=> 1,
 			'is_gui'		=> 1,
 			'module' 		=> 'firesale'
@@ -473,6 +502,20 @@ class Module_Firesale extends Module {
 			'options'		=> '1=Yes|0=No',
 			'is_required' 	=> 1,
 			'is_gui'		=> 1,
+			'module' 		=> 'firesale'
+		);
+
+		// Require login to purchase
+		$settings[] = array(
+			'slug' 		  	=> 'firesale_login',
+			'title' 	  	=> 'Require login to purchase?',
+			'description' 	=> 'Ensure a user is logged in before allowing them to buy products',
+			'default' 		=> '0',
+			'value' 		=> '0',
+			'type' 			=> 'select',
+			'options' 		=> '1=Yes|0=No',
+			'is_required' 	=> 1,
+			'is_gui' 		=> 1,
 			'module' 		=> 'firesale'
 		);
 
@@ -501,10 +544,12 @@ class Module_Firesale extends Module {
 	public function templates($action)
 	{
 
-		$templates = array('order-complete-admin', 'order-complete-user');
+		// Define our templates
+		$templates = array('order-complete-admin', 'order-complete-user', 'order-dispatched');
 		$sql = "INSERT INTO `" . SITE_REF . "_email_templates` (`slug`, `name`, `description`, `subject`, `body`, `lang`, `is_default`, `module`) VALUES
-				('order-complete-admin', 'Order Complete (Admin)', 'Sent to the site admin once an order has been completed', '{{ settings:site_name }} :: An order has been complete', 'Email body', 'en', 0, ''),
-				('order-complete-user', 'Order Complete (User)', 'Sent to the user once an order has been completed', '{{ settings:site_name }} :: Your Order Confirmation', 'Email body', 'en', 0, '');";
+				('order-complete-admin', 'Order Complete (Admin)', 'Sent to the site admin once an order has been completed', '{{ settings:site_name }} :: An order has been complete', '<table border=\"0\" cellpadding=\"2\" cellspacing=\"0\" style=\"width: 500px;\">\r\n	<tbody>\r\n		<tr>\r\n			<td>\r\n				<p>\r\n					<strong>Add Your Logo Here</strong></p>\r\n				<p>\r\n					&nbsp;</p>\r\n			</td>\r\n			<td style=\"text-align: right;\">\r\n				<p>\r\n					<strong>Order ID: #{{ id }}</strong></p>\r\n				<p>\r\n					&nbsp;</p>\r\n			</td>\r\n		</tr>\r\n		<tr>\r\n			<td colspan=\"2\">\r\n				<p>\r\n					Dear Admin,</p>\r\n				<p>\r\n					You have just recieved a new order on {{ settings:site_name }}.<br />\r\n					<br />\r\n					&nbsp;</p>\r\n			</td>\r\n		</tr>\r\n		<tr>\r\n			<td>\r\n				<p>\r\n					<strong>Postage Information:</strong></p>\r\n				<p>\r\n					{{ if ship_to.firstname }}{{ ship_to.firstname }}<br />\r\n					{{ endif }} {{ if ship_to.address1 }}{{ ship_to.address1 }}<br />\r\n					{{ endif }} {{ if ship_to.address2 }}{{ ship_to.address2 }}<br />\r\n					{{ endif }} {{ if ship_to.city }}{{ ship_to.city }}<br />\r\n					{{ endif }} {{ if ship_to.county }}{{ ship_to.county }}<br />\r\n					{{ endif }} {{ if ship_to.postcode }}{{ ship_to.postcode }}<br />\r\n					{{ endif }} {{ ship_to.country.name }}</p>\r\n			</td>\r\n			<td>\r\n				<p>\r\n					<strong>Billing Information:</strong></p>\r\n				<p>\r\n					{{ if bill_to.firstname }}{{ bill_to.firstname }}<br />\r\n					{{ endif }} {{ if bill_to.address1 }}{{ bill_to.address1 }}<br />\r\n					{{ endif }} {{ if bill_to.address2 }}{{ bill_to.address2 }}<br />\r\n					{{ endif }} {{ if bill_to.city }}{{ bill_to.city }}<br />\r\n					{{ endif }} {{ if bill_to.county }}{{ bill_to.county }}<br />\r\n					{{ endif }} {{ if bill_to.postcode }}{{ bill_to.postcode }}<br />\r\n					{{ endif }} {{ bill_to.country.name }}</p>\r\n			</td>\r\n		</tr>\r\n		<tr>\r\n			<td colspan=\"2\">\r\n				<br />\r\n				<br />\r\n				<table border=\"0\" cellpadding=\"2\" cellspacing=\"0\" style=\"width: 100%\">\r\n					<thead>\r\n						<tr style=\"border-top: 1px solid #ccc\">\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Product</th>\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Unit Price</th>\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Quantity</th>\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Total</th>\r\n						</tr>\r\n					</thead>\r\n					<tfoot>\r\n						<tr style=\"border-top: 1px solid #ccc\">\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Sub-total:</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_sub }}</td>\r\n						</tr>\r\n						<tr>\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Postage:</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_ship }}</td>\r\n						</tr>\r\n						<tr>\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Tax ({{ settings:firesale_tax }}%):</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_tax }}</td>\r\n						</tr>\r\n						<tr>\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Total:</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_total }}</td>\r\n						</tr>\r\n					</tfoot>\r\n					<tbody>\r\n{{ contents }}\r\n						<tr style=\"border-top: 1px solid #ccc\">\r\n							<td>\r\n								<a href=\"{{ url:base }}product/{{ slug }}\">{{ name }}<br />\r\n								Item No: {{ code }}</a></td>\r\n							<td>\r\n								{{ settings:currency }} {{ helper:number_format string=price decimals=\"2\" }}</td>\r\n							<td>\r\n								{{ qty }}</td>\r\n							<td>\r\n								{{ settings:currency }} {{ helper:number_format string=subtotal decimals=\"2\" }}</td>\r\n						</tr>\r\n{{ /contents }}\r\n					</tbody>\r\n				</table>\r\n			</td>\r\n		</tr>\r\n	</tbody>\r\n</table>\r\n<p>\r\n	&nbsp;</p>', 'en', 0, ''),
+				('order-complete-user', 'Order Complete (User)', 'Sent to the user once an order has been completed', '{{ settings:site_name }} :: Your Order Confirmation', '<table border=\"0\" cellpadding=\"2\" cellspacing=\"0\" style=\"width: 500px;\">\r\n	<tbody>\r\n		<tr>\r\n			<td>\r\n				<p>\r\n					<strong>Add Your Logo Here</strong></p>\r\n				<p>\r\n					&nbsp;</p>\r\n			</td>\r\n			<td style=\"text-align: right;\">\r\n				<p>\r\n					<strong>Order ID: #{{ id }}</strong></p>\r\n				<p>\r\n					&nbsp;</p>\r\n			</td>\r\n		</tr>\r\n		<tr>\r\n			<td colspan=\"2\">\r\n				<p>\r\n					Dear {{ bill_to.firstname }},</p>\r\n				<p>\r\n					Thank you for your recent order on {{ settings:site_name }}, below you will find the details of your order and these should be kept for your own records.<br />\r\n					<br />\r\n					&nbsp;</p>\r\n			</td>\r\n		</tr>\r\n		<tr>\r\n			<td>\r\n				<p>\r\n					<strong>Postage Information:</strong></p>\r\n				<p>\r\n					{{ if ship_to.firstname }}{{ ship_to.firstname }}<br />\r\n					{{ endif }} {{ if ship_to.address1 }}{{ ship_to.address1 }}<br />\r\n					{{ endif }} {{ if ship_to.address2 }}{{ ship_to.address2 }}<br />\r\n					{{ endif }} {{ if ship_to.city }}{{ ship_to.city }}<br />\r\n					{{ endif }} {{ if ship_to.county }}{{ ship_to.county }}<br />\r\n					{{ endif }} {{ if ship_to.postcode }}{{ ship_to.postcode }}<br />\r\n					{{ endif }} {{ ship_to.country.name }}</p>\r\n			</td>\r\n			<td>\r\n				<p>\r\n					<strong>Billing Information:</strong></p>\r\n				<p>\r\n					{{ if bill_to.firstname }}{{ bill_to.firstname }}<br />\r\n					{{ endif }} {{ if bill_to.address1 }}{{ bill_to.address1 }}<br />\r\n					{{ endif }} {{ if bill_to.address2 }}{{ bill_to.address2 }}<br />\r\n					{{ endif }} {{ if bill_to.city }}{{ bill_to.city }}<br />\r\n					{{ endif }} {{ if bill_to.county }}{{ bill_to.county }}<br />\r\n					{{ endif }} {{ if bill_to.postcode }}{{ bill_to.postcode }}<br />\r\n					{{ endif }} {{ bill_to.country.name }}</p>\r\n			</td>\r\n		</tr>\r\n		<tr>\r\n			<td colspan=\"2\">\r\n				<br />\r\n				<br />\r\n				<table border=\"0\" cellpadding=\"2\" cellspacing=\"0\" style=\"width: 100%\">\r\n					<thead>\r\n						<tr style=\"border-top: 1px solid #ccc\">\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Product</th>\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Unit Price</th>\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Quantity</th>\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Total</th>\r\n						</tr>\r\n					</thead>\r\n					<tfoot>\r\n						<tr style=\"border-top: 1px solid #ccc\">\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Sub-total:</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_sub }}</td>\r\n						</tr>\r\n						<tr>\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Postage:</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_ship }}</td>\r\n						</tr>\r\n						<tr>\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Tax ({{ settings:firesale_tax }}%):</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_tax }}</td>\r\n						</tr>\r\n						<tr>\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Total:</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_total }}</td>\r\n						</tr>\r\n					</tfoot>\r\n					<tbody>\r\n{{ contents }}\r\n						<tr style=\"border-top: 1px solid #ccc\">\r\n							<td>\r\n								<a href=\"{{ url:base }}product/{{ slug }}\">{{ name }}<br />\r\n								Item No: {{ code }}</a></td>\r\n							<td>\r\n								{{ settings:currency }} {{ helper:number_format string=price decimals=\"2\" }}</td>\r\n							<td>\r\n								{{ qty }}</td>\r\n							<td>\r\n								{{ settings:currency }} {{ helper:number_format string=subtotal decimals=\"2\" }}</td>\r\n						</tr>\r\n{{ /contents }}\r\n					</tbody>\r\n				</table>\r\n			</td>\r\n		</tr>\r\n		<tr>\r\n			<td colspan=\"2\">\r\n				<br />\r\n				<br />\r\n				<p>\r\n					Please note this is just a confirmation of your order, once payment has been processed and your items have been dispatched we will contact you again to let you know.</p>\r\n				<p>\r\n					Thank you very much for your custom, and we hope to see you back on {{ settings:site_name }} again soon!</p>\r\n			</td>\r\n		</tr>\r\n	</tbody>\r\n</table>\r\n<p>\r\n	&nbsp;</p>', 'en', 0, ''),
+				('order-dispatched', 'Order Dispatched (user)', 'Sent to the user when their order has been dispatched', '{{ settings:site_name }} :: Your Order Has Been Dispatched', '<table border=\"0\" cellpadding=\"2\" cellspacing=\"0\" style=\"width: 500px;\">\r\n	<tbody>\r\n		<tr>\r\n			<td>\r\n				<p>\r\n					<strong>Add Your Logo Here</strong></p>\r\n				<p>\r\n					&nbsp;</p>\r\n			</td>\r\n			<td style=\"text-align: right;\">\r\n				<p>\r\n					<strong>Order ID: #{{ id }}</strong></p>\r\n				<p>\r\n					Expected delivery date: <strong>???</strong></p>\r\n			</td>\r\n		</tr>\r\n		<tr>\r\n			<td colspan=\"2\">\r\n				<p>\r\n					Dear {{ bill_to.firstname }},</p>\r\n				<p>\r\n					Thank you for your recent order on {{ settings:site_name }}, we''re just letting you know that your order has been dispatched as well as confirm the details once again.<br />\r\n					<br />\r\n					&nbsp;</p>\r\n			</td>\r\n		</tr>\r\n		<tr>\r\n			<td>\r\n				<p>\r\n					<strong>Postage Information:</strong></p>\r\n				<p>\r\n					{{ if ship_to.firstname }}{{ ship_to.firstname }}<br />\r\n					{{ endif }} {{ if ship_to.address1 }}{{ ship_to.address1 }}<br />\r\n					{{ endif }} {{ if ship_to.address2 }}{{ ship_to.address2 }}<br />\r\n					{{ endif }} {{ if ship_to.city }}{{ ship_to.city }}<br />\r\n					{{ endif }} {{ if ship_to.county }}{{ ship_to.county }}<br />\r\n					{{ endif }} {{ if ship_to.postcode }}{{ ship_to.postcode }}<br />\r\n					{{ endif }} {{ ship_to.country.name }}</p>\r\n			</td>\r\n			<td>\r\n				<p>\r\n					<strong>Billing Information:</strong></p>\r\n				<p>\r\n					{{ if bill_to.firstname }}{{ bill_to.firstname }}<br />\r\n					{{ endif }} {{ if bill_to.address1 }}{{ bill_to.address1 }}<br />\r\n					{{ endif }} {{ if bill_to.address2 }}{{ bill_to.address2 }}<br />\r\n					{{ endif }} {{ if bill_to.city }}{{ bill_to.city }}<br />\r\n					{{ endif }} {{ if bill_to.county }}{{ bill_to.county }}<br />\r\n					{{ endif }} {{ if bill_to.postcode }}{{ bill_to.postcode }}<br />\r\n					{{ endif }} {{ bill_to.country.name }}</p>\r\n			</td>\r\n		</tr>\r\n		<tr>\r\n			<td colspan=\"2\">\r\n				<br />\r\n				<br />\r\n				<table border=\"0\" cellpadding=\"2\" cellspacing=\"0\" style=\"width: 100%\">\r\n					<thead>\r\n						<tr style=\"border-top: 1px solid #ccc\">\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Product</th>\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Unit Price</th>\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Quantity</th>\r\n							<th style=\"font-weight:bold;text-align:left\">\r\n								Total</th>\r\n						</tr>\r\n					</thead>\r\n					<tfoot>\r\n						<tr style=\"border-top: 1px solid #ccc\">\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Sub-total:</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_sub }}</td>\r\n						</tr>\r\n						<tr>\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Postage:</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_ship }}</td>\r\n						</tr>\r\n						<tr>\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Tax ({{ settings:firesale_tax }}%):</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_tax }}</td>\r\n						</tr>\r\n						<tr>\r\n							<td colspan=\"2\">\r\n								&nbsp;</td>\r\n							<td>\r\n								<strong>Total:</strong></td>\r\n							<td>\r\n								{{ settings:currency }} {{ price_total }}</td>\r\n						</tr>\r\n					</tfoot>\r\n					<tbody>\r\n{{ contents }}\r\n						<tr style=\"border-top: 1px solid #ccc\">\r\n							<td>\r\n								<a href=\"{{ url:base }}product/{{ slug }}\">{{ name }}<br />\r\n								Item No: {{ code }}</a></td>\r\n							<td>\r\n								{{ settings:currency }} {{ helper:number_format string=price decimals=\"2\" }}</td>\r\n							<td>\r\n								{{ qty }}</td>\r\n							<td>\r\n								{{ settings:currency }} {{ helper:number_format string=subtotal decimals=\"2\" }}</td>\r\n						</tr>\r\n{{ /contents }}\r\n					</tbody>\r\n				</table>\r\n			</td>\r\n		</tr>\r\n		<tr>\r\n			<td colspan=\"2\">\r\n				<br /><br />\r\n				<p>\r\n					Once again, thank you very much for your custom, and we hope to see you back on {{ settings:site_name }} again soon!</p>\r\n			</td>\r\n		</tr>\r\n	</tbody>\r\n</table>\r\n<p>\r\n	&nbsp;</p>', 'en', 0, '');";
 
 		if( $action == 'add' )
 		{

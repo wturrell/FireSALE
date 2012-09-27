@@ -21,7 +21,8 @@ class Products_m extends MY_Model {
 							2 => 'firesale:label_stock_low',
 							3 => 'firesale:label_stock_out',
 							4 => 'firesale:label_stock_order',
-							5 => 'firesale:label_stock_ended'
+							5 => 'firesale:label_stock_ended',
+							6 => 'firesale:label_stock_unlimited'
 						   );
 	
 	/**
@@ -32,9 +33,10 @@ class Products_m extends MY_Model {
 	 * @access public
 	 */
 	function __construct()
-    {
-        parent::__construct();
-    }
+	{
+		parent::__construct();
+		$this->load->helper('firesale/general');
+	}
 	
 	/**
 	 * Builds an array of the require keys and values for a dropdown of products,
@@ -93,6 +95,7 @@ class Products_m extends MY_Model {
 
 			// Get and format product data
 			$product 			 = current($product['entries']);
+			$product['snippet']  = truncate_words($product['description']);
 			$product['category'] = $this->get_categories($product['id']);
 			$product['image']    = $this->get_single_image($product['id']);
 
@@ -117,10 +120,9 @@ class Products_m extends MY_Model {
 	{
 
 		// Build initial query
-		$query = $this->db->select($this->_table . '.id')
-						  ->from($this->_table)
-						  ->order_by('id', 'desc')
-						  ->group_by('id');
+		$query = $this->db->select('p.id')
+						  ->from($this->_table . ' AS p')
+						  ->group_by('p.id');
 		
 		// Add limits if set
 		if( $start > 0 OR $limit > 0 )
@@ -133,8 +135,8 @@ class Products_m extends MY_Model {
 		{
 			if( $key == 'category' )
 			{
-				$query->join('firesale_products_firesale_categories', 'firesale_products.id = firesale_products_firesale_categories.row_id', 'inner')
-					  ->where('firesale_categories_id', $value);
+				$query->join('firesale_products_firesale_categories AS pc', 'p.id = pc.row_id', 'inner')
+					  ->where('pc.firesale_categories_id', $value);
 			}
 			else
 			{
@@ -196,7 +198,8 @@ class Products_m extends MY_Model {
 			// Update categories
 			if( isset($input['parent']) AND !empty($input['parent']) )
 			{
-				$this->update_categories($id, $stream_id, implode(',', $input['parent']));
+				$categories = 'category_' . implode(',category_', $input['parent']);
+				$this->update_categories($id, $stream_id, $categories);
 			}
 
 			return TRUE;
@@ -309,6 +312,53 @@ class Products_m extends MY_Model {
 	}
 
 	/**
+	 * Updates the basic information for products with the same slug as the current
+	 * product being edited. This requires the option to be selected in admin
+	 * otherwise they will be left untouched.
+	 * 
+	 * @param integer $id The primary product ID
+	 * @param string $slug The slug to update
+	 * @param array $input The post array to use
+	 * @return TRUE or FALSE on success
+	 * @access public
+	 */
+	public function update_duplicates($id, $slug, $input)
+	{
+
+		/**
+		 * @todo Add to options and check it before performing the following actions
+		 */
+
+		// Get IDs of related products
+		$products = $this->db->select('id')->where('slug', $slug)->get('firesale_products')->result_array();
+
+		// Check products
+		if( count($products) > 1 )
+		{
+
+			// Build data
+			$data = array(
+						'slug'		  => $input['slug'],
+						'description' => $input['description']
+						/**
+						 * @todo Figure out other data to be added here
+						 */
+					);
+
+			// Loop linked products
+			foreach( $products AS $product )
+			{
+
+				// Update them
+				$this->db->where('id', $product['id'])->update('firesale_products', $data);
+
+			}
+
+		}
+
+	}
+
+	/**
 	 * Updates the mulitple categories for a Product.
 	 * Required at the moment since the Streams Multiple field type doesn't seem
 	 * to do this automatically at the moment.
@@ -326,21 +376,29 @@ class Products_m extends MY_Model {
 		$this->db->where('row_id', $product_id)->delete('firesale_products_firesale_categories');
 
 		// Get array of new categories
-		$categories = str_replace('category_', '', $categories);
-		$categories = explode(',', $categories);
+		$categories = explode(',', str_replace(' ', '', $categories));
 
 		// Loop and insert
 		for( $i = 0; $i < count($categories); $i++ )
 		{
 			
-			// Build data
-			$data = array('row_id' => $product_id, 'firesale_products_id' => $stream_id, 'firesale_categories_id' => trim($categories[$i]));
+			// Get ID
+			list($ignore, $id) = explode('_', $categories[$i]);
 
-			// Check exists
-			if( $this->db->where($data)->get('firesale_products_firesale_categories')->num_rows() == 0 )
+			// Check for valid category
+			if( ( 0 + $id ) > 0 AND $this->categories_m->get_category($id) !== FALSE )
 			{
-				// Insert it
-				$this->db->insert('default_firesale_products_firesale_categories', $data);
+
+				// Build data
+				$data = array('row_id' => $product_id, 'firesale_products_id' => $stream_id, 'firesale_categories_id' => trim($id));
+
+				// Check exists
+				if( $this->db->where($data)->get('firesale_products_firesale_categories')->num_rows() == 0 )
+				{
+					// Insert it
+					$this->db->insert('default_firesale_products_firesale_categories', $data);
+				}
+
 			}
 
 		}
@@ -468,6 +526,26 @@ class Products_m extends MY_Model {
 	}
 
 	/**
+	 * Category fix to delete existing categories, format input, etc.
+	 *
+	 * @param integer $product_id The product ID
+	 * @param string $category Category input from POST
+	 * @return string Formatted categories
+	 * @access public
+	 */
+	public function category_fix($product_id, $category)
+	{
+
+		// Drop current categories
+		$this->db->where('row_id', $product_id)->delete('firesale_products_firesale_categories');
+
+		// Fix input
+		$cats = explode(',', $category);
+		$cats = array_unique($cats);
+		return implode(',', $cats);
+	}
+
+	/**
 	 * Gets a Files folder object based on the Product/Name slug.
 	 *
 	 * @param string $slug The Slug to query
@@ -511,6 +589,35 @@ class Products_m extends MY_Model {
 	}
 
 	/**
+	 * Keeps the file folder for images in sync with changes made to a products
+	 * slug - otherwise upon updating a products slug the images would go missing.
+	 *
+	 * @param string $old The old slug for the folder
+	 * @param string $new The new slug for the folder
+	 * @return boolean TRUE or FALSE on success
+	 * @access public
+	 */
+	public function update_folder_slug($old, $new)
+	{
+
+		// Variables
+		$folder = $this->get_file_folder_by_slug($old);
+
+		// Found?
+		if( $file !== FALSE AND $folder->id > 0 )
+		{
+
+			if( $this->db->where('id', $folder->id)->update('file_folders', array('slug' => $new)) )
+			{
+				return TRUE;
+			}
+
+		}
+
+		return FALSE;
+	}
+
+	/**
 	 * When uploading a new image for a product, based on the settings defined
 	 * in the admin section we can make the image square. This is a requirement
 	 * for many designs to keep things consistent and the same height/width
@@ -520,44 +627,40 @@ class Products_m extends MY_Model {
 	 * @return boolean TRUE or FALSE based on the status of the resize
 	 * @access public
 	 */
-	public function make_square($status)
+	public function make_square($status, $allow = array('jpeg', 'png') )
 	{
 
 		// Variables
-		$bg   = array(255, 255, 255);
-		$id   = $status['data']['id'];
-		$w    = $status['data']['width'];
-		$h	  = $status['data']['height'];
-		$mime = str_replace('image/', '', $status['data']['mimetype']);
-		$path = $_SERVER['DOCUMENT_ROOT'] . '/uploads/' . SITE_REF . '/files/' . $status['data']['filename'];
+		$bg    = array(255, 255, 255);
+		$id    = $status['data']['id'];
+		$w     = $status['data']['width'];
+		$h	   = $status['data']['height'];
+		$mime  = str_replace('image/', '', $status['data']['mimetype']);
+		$path  = $_SERVER['DOCUMENT_ROOT'] . '/uploads/' . SITE_REF . '/files/' . $status['data']['filename'];
 
-		if( $this->settings->get('image_square') == '1' )
+		// Is it required?
+		if( $w != $h AND in_array($mime, $allow) )
 		{
 	
-			if( $w != $h )
-			{
+			// Settings
+			$size = ( $w > $h ? $w : $h );
+			$img  = imagecreatetruecolor($size, $size);
+			$bg   = imagecolorallocate($img, $bg[0], $bg[1], $bg[2]);
+			$copy = 'imagecreatefrom' . $mime;
+			$save = 'image' . $mime;
+			$orig = $copy($path);
+			$x 	  = ( $w != $size ? round( ( $size - $w ) / 2 ) : 0 );
+			$y 	  = ( $h != $size ? round( ( $size - $h ) / 2 ) : 0 );
 		
-				// Settings
-				$size = ( $w > $h ? $w : $h );
-				$img  = imagecreatetruecolor($size, $size);
-				$bg   = imagecolorallocate($img, $bg[0], $bg[1], $bg[2]);
-				$copy = 'imagecreatefrom' . $mime;
-				$save = 'image' . $mime;
-				$orig = $copy($path);
-				$x 	  = ( $w != $size ? round( ( $size - $w ) / 2 ) : 0 );
-				$y 	  = ( $h != $size ? round( ( $size - $h ) / 2 ) : 0 );
-			
-				// Build image
-				imagefilledrectangle($img, 0, 0, $size, $size, $bg);
-				imagecopy($img, $orig, $x, $y, 0, 0, $w, $h);
-				$save($img, $path);
-				imagedestroy($orig);
-				imagedestroy($img);
+			// Build image
+			imagefilledrectangle($img, 0, 0, $size, $size, $bg);
+			imagecopy($img, $orig, $x, $y, 0, 0, $w, $h);
+			$save($img, $path);
+			imagedestroy($orig);
+			imagedestroy($img);
 
-				// Update files table
-				$this->db->where('id', $id)->update('files', array('width' => $size, 'height' => $size));
-	
-			}
+			// Update files table
+			$this->db->where('id', $id)->update('files', array('width' => $size, 'height' => $size));
 
 		}
 			

@@ -2,18 +2,6 @@
 
 class Orders_m extends MY_Model
 {
-
-	/**
-	 * Loads the parent constructor and gets an
-	 * instance of CI.
-	 *
-	 * @return void
-	 * @access public
-	 */
-	function __construct()
-    {
-        parent::__construct();
-    }
   
     /**
      * Gets the products for a given order
@@ -36,8 +24,8 @@ class Orders_m extends MY_Model
 		// Build overall count and add image
 		foreach( $items AS &$item )
 		{
-			$total += $item['count'];
-			$item   = $this->products_m->get_single_image($item['id']);
+			$total         += $item['count'];
+			$item['image']  = $this->products_m->get_single_image($item['id']);
 		}
 		
 		// Return
@@ -168,7 +156,7 @@ class Orders_m extends MY_Model
 				 ->where("product_id", $product['id']);
 
 		// Stock?
-		if( isset($product['stock']) AND $qty > $product['stock'] )
+		if( isset($product['stock']) AND $product['stock_status']['key'] != 6 AND $qty > $product['stock'] )
 		{
 			$qty = $product['stock'];
 		}
@@ -195,10 +183,12 @@ class Orders_m extends MY_Model
 		}
 		else
 		{
-			if( $this->db->update('firesale_orders_items', array('qty' => $qty), array('order_id' => $order_id, 'product_id' => $product['id'])) )
+
+			if( $this->db->where('order_id', $order_id)->where('product_id', $product['id'])->update('firesale_orders_items', array('qty' => $qty)) )
 			{
 				return TRUE;
 			}
+
 		}
 
 		return FALSE;
@@ -223,7 +213,7 @@ class Orders_m extends MY_Model
 		// Run through cart items
 		if( $cart == TRUE )
 		{
-			foreach( $this->cart->contents() AS $item )
+			foreach( $this->fs_cart->contents() AS $item )
 			{
 				$total += ( $item['qty'] * $item['price'] );
 			}
@@ -245,9 +235,9 @@ class Orders_m extends MY_Model
 		// Update cart
 		if( $cart == TRUE )
 		{
-			$this->cart->total    = number_format($total, 2);
-			$this->cart->subtotal = number_format($sub, 2);
-			$this->cart->tax 	  = number_format(( $total - $sub), 2);
+			$this->fs_cart->total    = number_format($total, 2);
+			$this->fs_cart->subtotal = number_format($sub, 2);
+			$this->fs_cart->tax 	  = number_format(( $total - $sub), 2);
 		}
 
 		// Update?
@@ -331,16 +321,25 @@ class Orders_m extends MY_Model
 		if( $order['total'] == 1 )
 		{
 
-			$order 			= $order['entries'][0];
-			$order['items'] = $this->db->get_where('firesale_orders_items', array('order_id' => (int)$order_id))->result_array();
-			
+			$order 			    = $order['entries'][0];
+			$order['items']     = $this->db->get_where('firesale_orders_items', array('order_id' => (int)$order_id))->result_array();
+			$order['price_tax'] = number_format(( $order['price_total'] - $order['price_sub'] ), 2);
+
 			foreach( $order['items'] AS $key => &$item )
 			{
+
+				// Get the product
 				$product       = $this->products_m->get_product($item['product_id']);
-				$item['id']	   = $product['id'];
-				$item          = array_merge($product, $item);
-				$item['total'] = number_format(( $item['price'] * $item['qty'] ), 2);
-				$item['no']	   = ( $key + 1 );
+
+				// Check it exists
+				if( $product !== FALSE )
+				{
+					$item['id']	   = $product['id'];
+					$item          = array_merge($product, $item);
+					$item['total'] = number_format(( $item['price'] * $item['qty'] ), 2);
+					$item['no']	   = ( $key + 1 );
+				}
+
 			}
 
 			return $order;
@@ -371,7 +370,12 @@ class Orders_m extends MY_Model
 			$data['stock']  = ( $product['stock'] - $stock );
 
 			// Get status
-			if( $data['stock'] < 0 )
+			if( $product['stock_status']['key'] == 6 )
+			{
+				// Unlimited, do nothing
+				return TRUE;
+			}
+			else if( $data['stock'] < 0 )
 			{
 				// We dun fucked up
 				$data['stock_status'] = 3;
@@ -409,8 +413,23 @@ class Orders_m extends MY_Model
 	public function update_status($order_id, $status = 0)
 	{
 
-		if( $this->db->where("id = '{$order_id}'")->update('firesale_orders', array('order_status' => $status)) )
+		// Update order status
+		if( $this->db->where('id', $order_id)->update('firesale_orders', array('order_status' => $status)) )
 		{
+
+			// Email update for dispatched
+			if( $status == 3 )
+			{
+
+				// Get the order
+				$order = $this->orders_m->get_order_by_id($order_id);
+
+				// Email the user
+				Events::trigger('email', array_merge($order, array('slug' => 'order-dispatched', 'to' => $order['bill_to']['email'])), 'array');
+
+			}
+
+
 			return TRUE;
 		}
 

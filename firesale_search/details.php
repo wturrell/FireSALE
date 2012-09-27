@@ -18,10 +18,12 @@ class Module_Firesale_Search extends Module {
 		
 		$info = array(
 			'name' => array(
-				'en' => 'FireSALE Search (Basic)'
+				'en' => 'FireSALE Search (Basic)',
+				'fr' => 'FireSale Recherche (Basique)'
 			),
 			'description' => array(
-				'en' => 'A lightweight eCommerce platform for PyroCMS.'
+				'en' => 'Product and category search with ajax capabilities', 
+				'fr' => 'Recherche dans les produits et la catégories, dynamisée par AJAX'
 			),
 			'frontend' 		=> TRUE,
 			'backend' 		=> FALSE,
@@ -42,7 +44,7 @@ class Module_Firesale_Search extends Module {
 			),
 			'events'			 => array(
 				'order_complete'     => array(
-					'model'		 => 'firesale_searcg/search_m',
+					'model'		 => 'firesale_search/search_m',
 					'function'	 => 'order_complete'
 				)
 			)

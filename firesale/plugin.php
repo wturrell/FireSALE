@@ -33,10 +33,19 @@ class Plugin_Firesale extends Plugin
 		$limit	   	   = $this->attribute('limit', 6);
 		$category  	   = $this->attribute('category', 0);
 		$order_by  	   = $this->attribute('order-by', 'ordering_count');
-		$order_dir 	   = $this->attribute('order-dir', 'desc');
+		$order_dir 	   = $this->attribute('order-dir', 'asc');
+		$exclude_empty = (bool)$this->attribute('exclude-empty', FALSE);
+
+		// Exclude empty categories?
+		if ($exclude_empty)
+		{
+			$this->db->where('(SELECT COUNT(id)
+				FROM ' . $this->db->dbprefix('firesale_products_firesale_categories') . '
+				WHERE firesale_categories_id=' . $this->db->dbprefix('firesale_categories.id') . ') >', 0);
+		}
 		
 		// Build query
-		$query = $this->db->select('id, title, slug')
+		$query = $this->db->select('id, title, parent, slug')
 					  	  ->from('firesale_categories')
 						  ->where('status', '1')
 						  ->where('parent', $category)
@@ -135,7 +144,7 @@ class Plugin_Firesale extends Plugin
 	
 		// Load libraries
 		$this->load->model('products_m');
-		$this->load->library('cart');
+		$this->load->library('fs_cart');
 
 		$tax  		 	= 0.2; // add to settings later
 		$data 		 	= new stdClass;
@@ -146,7 +155,7 @@ class Plugin_Firesale extends Plugin
 		$data->products = array();
 		
 		// Loop products in cart
-		foreach( $this->cart->contents() as $id => $item )
+		foreach( $this->fs_cart->contents() as $id => $item )
 		{
 		
 			$product = $this->products_m->get_product($item['id']);

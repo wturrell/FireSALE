@@ -6,12 +6,8 @@ class Admin_products extends Admin_Controller
 	public $stream  = NULL;
 	public $perpage = 30;
 	public $section = 'products';
-	public $tabs	= array('description'      => array('description'),
-							'shipping options' => array('shipping_weight', 'shipping_height', 'shipping_width', 'shipping_depth'),
-							'metadata'		   => array('meta_title', 'meta_description', 'meta_keywords'),
-							'_attributes'	   => '{{ firesale_attributes:form product=id }}',
-							'_images'		   => array());
-
+	public $tabs	= array('description' => array('description'),
+							'_images'	  => array());
 
 	public function __construct()
 	{
@@ -96,7 +92,7 @@ class Admin_products extends Admin_Controller
 			$input 	= $this->input->post();
 			$skip	= array('btnAction');
 			$extra 	= array(
-						'return' 			=> '/admin/firesale/products/edit/-id-',
+						'return' 			=> '/admin/firesale/products/edit/-id-?' . time(),
 						'success_message'	=> lang('firesale:prod_' . ( $id == NULL ? 'add' : 'edit' ) . '_success'),
 						'error_message'		=> lang('firesale:prod_' . ( $id == NULL ? 'add' : 'edit' ) . '_error')
 					  );
@@ -107,19 +103,28 @@ class Admin_products extends Admin_Controller
 				$extra['return'] = '/admin/firesale/products';
 			}
 
-			// Manually update categories
-			// Multiple tends not to do it
+			// Perform additional tasks to existing products
 			if( $id !== NULL )
 			{
-				$this->products_m->update_categories($id, $this->stream->id, $input['category']);
-				unset($_POST['category']);
-			}
 
-			// Added to seperate if since above will be removed for 2.2
-			if( $id !== NULL )
-			{
+				// Temporary until we move to grid
+				// Remove duplicate entries before updating categories
+				// Also deletes all existing categories from a product
+				$input['category'] = $_POST['category'] = $this->products_m->category_fix($id, $input['category']);
+
+				// Update duplicates
+				$this->products_m->update_duplicates($id, $row->slug, $input);
+
+				// Update image folder?
+				if( $row->slug != $input['slug'] )
+				{
+					$this->products_m->update_folder_slug($row->slug, $input['slug']);
+				}
+
+				// Fire event
 				$data = array_merge(array('id' => $id, 'stream' => 'firesale_products'), $input);
 				Events::trigger('product_updated', $data);
+
 			}
 		
 		}
@@ -133,11 +138,14 @@ class Admin_products extends Admin_Controller
 		// Get the stream fields
 		$fields = $this->fields->build_form($this->stream, ( $id == NULL ? 'new' : 'edit' ), ( $id == NULL ? $input : $row ), FALSE, FALSE, $skip, $extra);
 
+		// Fire build event
+		Events::trigger('form_build', $this);
+
 		// Assign variables
 		if( $row !== NULL ) { $this->data = $row; }
-		$this->data->id		=  $id;
-		$this->data->fields =  fields_to_tabs($fields, $this->tabs);
-		$this->data->tabs	=  array_reverse(array_keys($this->data->fields));
+		$this->data->id		= $id;
+		$this->data->fields = fields_to_tabs($fields, $this->tabs);
+		$this->data->tabs	= array_keys($this->data->fields);
 		
 		// Get current images
 		if( $row != FALSE )
@@ -282,6 +290,7 @@ class Admin_products extends Admin_Controller
 		// Get product
 		$row    = $this->row_m->get_row($id, $this->stream, FALSE);
 		$folder = $this->products_m->get_file_folder_by_slug($row->slug);
+		$allow  = array('jpeg', 'jpg', 'png', 'gif', 'bmp');
 
 		// Create folder?
 		if( !$folder )
@@ -299,17 +308,38 @@ class Admin_products extends Admin_Controller
 			$status = Files::upload($folder->id);
 
 			// Make square?
-			$this->products_m->make_square($status);
+			if( $status['status'] == TRUE AND $this->settings->get('image_square') == 1 )
+			{
+				$this->products_m->make_square($status, $allow);
+			}
 
 			// Ajax status
-			unset($status['data']);
-			echo json_encode($status);
+			echo json_encode(array('status' => $status['status'], 'message' => $status['message']));
 			exit;
 		}
 
 		// Seems it was unsuccessful
 		echo json_encode(array('status' => FALSE, 'message' => 'Error uploading image'));
 		exit();
+	}
+
+	public function delete_image($id)
+	{
+
+		// Delete file
+		if( Files::delete_file($id) )
+		{
+			// Success
+			$this->session->set_flashdata('success', lang('firesale:prod_delimg_success'));
+		}
+		else
+		{
+			// Error
+			$this->session->set_flashdata('error', lang('firesale:prod_delimg_error'));
+		}
+
+		// Redirect
+		redirect($_SERVER['HTTP_REFERER']);
 	}
 	
 	public function ajax_quick_edit()
